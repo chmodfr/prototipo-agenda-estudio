@@ -55,8 +55,8 @@ export function checkSlotAvailability(
   const slotEndTime = addHours(slotTime, 1);
 
   for (const booking of bookings) {
-    const bookingStartTime = new Date(booking.startTime); // Ensure Date objects
-    const bookingEndTime = new Date(booking.endTime);   // Ensure Date objects
+    const bookingStartTime = new Date(booking.startTime); 
+    const bookingEndTime = new Date(booking.endTime);   
 
     if (
       (slotTime >= bookingStartTime && slotTime < bookingEndTime) ||
@@ -98,7 +98,8 @@ export function checkSlotAvailability(
 export function getBookingsForWeek(
   weekDates: Date[],
   allBookingDocuments: BookingDocument[],
-  allClients: ClientDocument[]
+  allClients: ClientDocument[],
+  allProjects: ProjectDocument[]
 ): Booking[] {
   if (weekDates.length === 0) return [];
 
@@ -112,15 +113,24 @@ export function getBookingsForWeek(
     })
     .map(doc => {
       const client = allClients.find(c => c.id === doc.clientId);
+      const project = allProjects.find(p => p.id === doc.projectId);
+      const clientName = client ? client.name : 'Unknown Client';
+      const projectName = project ? project.name : "Unknown Project";
+      // Assuming a default service or deriving from project if needed
+      const service = `Session for ${projectName}`; 
+      const bookingPrice = project ? calculateProjectCost([doc], [project])?.totalAmount : 0;
+
+
       return {
         id: doc.id,
         startTime: new Date(doc.startTime),
         endTime: new Date(doc.endTime),
         clientId: doc.clientId,
-        clientName: client ? client.name : 'Unknown Client',
+        clientName: clientName,
         projectId: doc.projectId,
-        service: `Service for project ${doc.projectId}`, // Placeholder, can be improved
-        title: `${client ? client.name : 'Unknown'} - Project ${doc.projectId.slice(-4)}`, // Placeholder
+        service: service, 
+        title: `${clientName} / ${projectName} - ${service.substring(0,20)}`,
+        price: bookingPrice // This will be per-booking price based on project's rate for its duration
       };
     });
 }
@@ -132,6 +142,7 @@ export function calculateBookingDurationInHours(booking: Booking | BookingDocume
   return durationMillis / (1000 * 60 * 60);
 }
 
+// Tiered pricing for client monthly invoices (NOT directly for project cost)
 function getTieredPricePerHour(totalHours: number): number {
   if (totalHours >= 40) return 160;
   if (totalHours >= 20) return 230; 
@@ -147,52 +158,65 @@ export function calculateClientMonthlyInvoice(bookingDurations: number[]): Clien
 }
 
 export function calculateMonthlyClientMetrics(
-  allBookings: Booking[], // UI-facing Booking type, should now have clientId
+  uiBookings: Booking[], 
   targetDateForMonth: Date,
-  allClients: ClientDocument[] // Pass all clients to look up names
+  allClients: ClientDocument[]
 ): MonthlyRecipe {
-  const clientBookingsData: Record<string, { durations: number[], clientName: string }> = {};
+  const clientBookingsData: Record<string, { durations: number[], clientName: string, totalDirectPrice: number }> = {};
 
-  allBookings.forEach(booking => {
+  uiBookings.forEach(booking => {
     if (isSameMonth(new Date(booking.startTime), targetDateForMonth) && booking.clientId) {
-      if (!clientBookingsData[booking.clientId]) {
-        const client = allClients.find(c => c.id === booking.clientId);
-        clientBookingsData[booking.clientId] = {
+      const client = allClients.find(c => c.id === booking.clientId);
+      const clientNameForRecipe = client ? client.name : `Client ID: ${booking.clientId}`;
+
+      if (!clientBookingsData[clientNameForRecipe]) {
+        clientBookingsData[clientNameForRecipe] = {
           durations: [],
-          clientName: client ? client.name : `Client ID: ${booking.clientId}` // Fallback name
+          clientName: clientNameForRecipe,
+          totalDirectPrice: 0,
         };
       }
       const duration = calculateBookingDurationInHours(booking);
-      clientBookingsData[booking.clientId].durations.push(duration);
+      clientBookingsData[clientNameForRecipe].durations.push(duration);
+      // Summing up the 'price' from each UI booking, which is already calculated based on project rates
+      clientBookingsData[clientNameForRecipe].totalDirectPrice += booking.price || 0; 
     }
   });
 
   const monthlyRecipe: MonthlyRecipe = {};
-  for (const clientId in clientBookingsData) {
-    const data = clientBookingsData[clientId];
-    if (data.durations.length > 0) {
-        monthlyRecipe[data.clientName] = calculateClientMonthlyInvoice(data.durations);
-    } else {
-        // This case should ideally not happen if clientBookingsData is populated correctly
-        monthlyRecipe[data.clientName] = { totalHours: 0, pricePerHour: getTieredPricePerHour(0), totalAmount: 0 };
-    }
+  for (const clientNameKey in clientBookingsData) {
+    const data = clientBookingsData[clientNameKey];
+    const totalHours = data.durations.reduce((sum, duration) => sum + duration, 0);
+    
+    // The pricePerHour here is an *average* if rates varied, or the consistent rate if not.
+    // The totalAmount is the sum of pre-calculated booking prices.
+    const effectivePricePerHour = totalHours > 0 ? data.totalDirectPrice / totalHours : 0;
+
+    monthlyRecipe[data.clientName] = { 
+        totalHours, 
+        pricePerHour: effectivePricePerHour, 
+        totalAmount: data.totalDirectPrice
+    };
   }
   return monthlyRecipe;
 }
 
-export function calculateProjectCost(
-  projectId: string,
-  allBookings: BookingDocument[],
-  allProjects: ProjectDocument[]
-): ProjectCostMetrics | null {
-  const project = allProjects.find(p => p.id === projectId);
 
-  if (!project) {
-    console.error(`Project with ID ${projectId} not found.`);
+export function calculateProjectCost(
+  projectBookings: BookingDocument[], // Pass only bookings for this project
+  projectDetailsArray: ProjectDocument[] // Should be an array with one project, or find it
+): ProjectCostMetrics | null {
+
+  if (!projectDetailsArray || projectDetailsArray.length === 0) {
+     console.error(`Project details not provided.`);
     return null;
   }
+  const project = projectDetailsArray[0]; // Assuming the correct project is passed
 
-  const projectBookings = allBookings.filter(b => b.projectId === projectId);
+  if (!project) {
+    console.error(`Project not found in provided details.`);
+    return null;
+  }
   
   let totalHours = 0;
   for (const booking of projectBookings) {
@@ -203,34 +227,37 @@ export function calculateProjectCost(
 
   if (project.billingType === 'personalizado') {
     if (typeof project.customRate !== 'number') {
-      console.error(`Project ${projectId} has billingType "personalizado" but customRate is missing or invalid.`);
-      return null;
+      console.warn(`Project ${project.id} has billingType "personalizado" but customRate is missing or invalid. Defaulting to 0.`);
+      pricePerHour = 0; // Default or handle as error
+    } else {
+      pricePerHour = project.customRate;
     }
-    pricePerHour = project.customRate;
   } else if (project.billingType === 'pacote') {
     if (!project.pacoteSelecionado) {
-      console.error(`Project ${projectId} has billingType "pacote" but pacoteSelecionado is missing.`);
-      return null;
-    }
-    switch (project.pacoteSelecionado) {
-      case 'Avulso':
-        pricePerHour = 350;
-        break;
-      case 'Pacote 10h':
-        pricePerHour = 260;
-        break;
-      case 'Pacote 20h':
-        pricePerHour = 230;
-        break;
-      case 'Pacote 40h':
-        pricePerHour = 160;
-        break;
-      default:
-        console.error(`Project ${projectId} has unknown pacoteSelecionado: ${project.pacoteSelecionado}`);
-        return null;
+      console.warn(`Project ${project.id} has billingType "pacote" but pacoteSelecionado is missing. Defaulting to Avulso rate.`);
+      pricePerHour = 350; // Default to Avulso or handle as error
+    } else {
+      switch (project.pacoteSelecionado) {
+        case 'Avulso':
+          pricePerHour = 350;
+          break;
+        case 'Pacote 10h':
+          pricePerHour = 260;
+          break;
+        case 'Pacote 20h':
+          pricePerHour = 230;
+          break;
+        case 'Pacote 40h':
+          pricePerHour = 160;
+          break;
+        default:
+          console.warn(`Project ${project.id} has unknown pacoteSelecionado: ${project.pacoteSelecionado}. Defaulting to Avulso rate.`);
+          pricePerHour = 350; // Default or handle as error
+          break;
+      }
     }
   } else {
-    console.error(`Project ${projectId} has an unknown billingType: ${project.billingType}`);
+    console.error(`Project ${project.id} has an unknown billingType: ${project.billingType}`);
     return null;
   }
 

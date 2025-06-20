@@ -21,7 +21,7 @@ import {
   checkSlotAvailability,
 } from '@/lib/calendar-utils';
 import type { Booking, TimeSlot as TimeSlotType } from '@/types';
-import type { ClientDocument, ProjectDocument } from '@/types/firestore'; // Import Firestore types
+import type { ClientDocument, ProjectDocument } from '@/types/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 interface DisplayTimeSlot extends TimeSlotType {
@@ -31,11 +31,11 @@ interface DisplayTimeSlot extends TimeSlotType {
 interface CalendarViewProps {
   initialDate: Date;
   onDateChange: (date: Date) => void;
-  bookings: Booking[]; // UI-facing Booking type
+  bookings: Booking[];
   onNewBookingsAdd: (newBookings: Booking[]) => void;
   calendarId: string;
-  allClients: ClientDocument[]; // Pass all clients for dropdown
-  allProjects: ProjectDocument[]; // Pass all projects for default project ID
+  allClients: ClientDocument[];
+  allProjects: ProjectDocument[];
 }
 
 export function CalendarView({ 
@@ -52,9 +52,13 @@ export function CalendarView({
   const [selectedSlots, setSelectedSlots] = useState<Date[]>([]);
   const { toast } = useToast();
 
-  const [selectedClientName, setSelectedClientName] = useState<string>(''); // Stores the name for selection
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [newClientNameInput, setNewClientNameInput] = useState<string>('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [newProjectNameInput, setNewProjectNameInput] = useState<string>('');
   const [serviceDetails, setServiceDetails] = useState<string>('Session');
+  
+  const HOURLY_RATE = 50; // Placeholder hourly rate
 
   useEffect(() => {
     setCurrentDateInternal(initialDate);
@@ -66,8 +70,22 @@ export function CalendarView({
   }, [currentDateInternal]);
   
   const existingClientOptions = useMemo(() => {
-    return allClients.map(client => ({ value: client.id, label: client.name }));
+    return allClients.filter(c => c.id !== 'client_internal_000').map(client => ({ value: client.id, label: client.name }));
   }, [allClients]);
+
+  const availableProjectOptions = useMemo(() => {
+    if (!selectedClientId || selectedClientId === 'NEW_CLIENT') return [];
+    return allProjects
+      .filter(p => p.clientId === selectedClientId && p.id !== 'project_general_calendar')
+      .map(project => ({ value: project.id, label: project.name }));
+  }, [allProjects, selectedClientId]);
+
+  useEffect(() => {
+    // Reset project selection when client changes
+    setSelectedProjectId('');
+    setNewProjectNameInput('');
+  }, [selectedClientId]);
+
 
   const calendarData = useMemo((): { date: Date; slots: DisplayTimeSlot[] }[] => {
     return weekDates.map(date => {
@@ -95,8 +113,10 @@ export function CalendarView({
     setCurrentDateInternal(newDate);
     onDateChange(newDate); 
     setSelectedSlots([]); 
-    setSelectedClientName('');
+    setSelectedClientId('');
     setNewClientNameInput('');
+    setSelectedProjectId('');
+    setNewProjectNameInput('');
     setServiceDetails('Session');
   };
 
@@ -154,17 +174,16 @@ export function CalendarView({
     let finalClientId = '';
     let finalClientNameToDisplay = '';
 
-    if (selectedClientName === 'NEW_CLIENT') {
+    if (selectedClientId === 'NEW_CLIENT') {
       finalClientNameToDisplay = newClientNameInput.trim();
       if (!finalClientNameToDisplay) {
         toast({ title: "Client Name Missing", description: "Please enter a name for the new client.", variant: "destructive" });
         return;
       }
-      finalClientId = `new-client-${Date.now()}`; // Temporary ID for mock data
-      // In a real app, you'd create the client in Firestore and get a real ID.
-      // And potentially update the allClients list in the parent.
+      finalClientId = `new-client-${Date.now()}`; 
+      // TODO: In a real app, create client in DB and update allClients in parent state.
     } else {
-      const client = allClients.find(c => c.name === selectedClientName);
+      const client = allClients.find(c => c.id === selectedClientId);
       if (!client) {
          toast({ title: "Client Not Selected", description: "Please select an existing client.", variant: "destructive" });
         return;
@@ -173,15 +192,34 @@ export function CalendarView({
       finalClientNameToDisplay = client.name;
     }
 
-    const finalServiceDetails = serviceDetails.trim() || "Session";
-    
-    const generalProject = allProjects.find(p => p.id === 'project_general_calendar');
-    if (!generalProject) {
-        toast({ title: "Configuration Error", description: "Default project for calendar bookings not found.", variant: "destructive" });
+    let finalProjectId = '';
+    let finalProjectNameToDisplay = '';
+
+    if (selectedProjectId === 'NEW_PROJECT') {
+      finalProjectNameToDisplay = newProjectNameInput.trim();
+      if (!finalProjectNameToDisplay) {
+        toast({ title: "Project Name Missing", description: "Please enter a name for the new project.", variant: "destructive" });
         return;
+      }
+      if (!finalClientId || finalClientId === 'NEW_CLIENT' && !newClientNameInput.trim()){
+         toast({ title: "Client Required for New Project", description: "A client must be selected or created before adding a new project.", variant: "destructive" });
+        return;
+      }
+      finalProjectId = `new-project-${Date.now()}`;
+      // TODO: In a real app, create project in DB and update allProjects in parent state.
+    } else {
+      const project = allProjects.find(p => p.id === selectedProjectId);
+      if (!project) {
+        toast({ title: "Project Not Selected", description: "Please select or create a project for this booking.", variant: "destructive" });
+        return;
+      }
+      finalProjectId = project.id;
+      finalProjectNameToDisplay = project.name;
     }
-    const finalProjectId = generalProject.id;
-    
+
+
+    const finalServiceDetails = serviceDetails.trim() || "Session";
+        
     const newlyConfirmedBookings: Booking[] = selectedSlots.map(slotTimeToBook => ({
       id: `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       startTime: slotTimeToBook,
@@ -189,20 +227,24 @@ export function CalendarView({
       clientId: finalClientId,
       clientName: finalClientNameToDisplay, 
       projectId: finalProjectId,
+      // For UI display, project name could be added here if needed, or derived later.
       service: finalServiceDetails,
-      title: `${finalClientNameToDisplay} - ${finalServiceDetails}`,
+      title: `${finalClientNameToDisplay} / ${finalProjectNameToDisplay} - ${finalServiceDetails}`,
+      price: HOURLY_RATE, // Each slot is 1 hour
     }));
 
     onNewBookingsAdd(newlyConfirmedBookings); 
     
     setSelectedSlots([]); 
-    setSelectedClientName('');
+    setSelectedClientId('');
     setNewClientNameInput('');
+    setSelectedProjectId('');
+    setNewProjectNameInput('');
     setServiceDetails('Session');
 
     toast({
       title: 'Booking Confirmed!',
-      description: `${newlyConfirmedBookings.length} slot(s) booked for ${finalClientNameToDisplay}.`,
+      description: `${newlyConfirmedBookings.length} slot(s) booked for ${finalClientNameToDisplay} on project ${finalProjectNameToDisplay}.`,
     });
   };
 
@@ -270,23 +312,23 @@ export function CalendarView({
       {selectedSlots.length > 0 && (
         <div className="mt-8 p-6 bg-secondary/30 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-4 text-primary-foreground">Booking Details for {selectedSlots.length} Slot(s)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="client-select" className="text-foreground">Client</Label>
-              <Select value={selectedClientName} onValueChange={setSelectedClientName}>
+              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
                 <SelectTrigger id="client-select" className="bg-input text-foreground">
                   <SelectValue placeholder="Select or Add Client" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover text-popover-foreground">
                   {existingClientOptions.map(option => (
-                    <SelectItem key={option.value} value={option.label}>{option.label}</SelectItem>
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                   ))}
                   <SelectItem value="NEW_CLIENT">Add New Client...</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {selectedClientName === 'NEW_CLIENT' && (
+            {selectedClientId === 'NEW_CLIENT' && (
               <div>
                 <Label htmlFor="new-client-name" className="text-foreground">New Client Name</Label>
                 <Input 
@@ -299,6 +341,43 @@ export function CalendarView({
               </div>
             )}
             
+            <div>
+              <Label htmlFor="project-select" className="text-foreground">Project</Label>
+              <Select 
+                value={selectedProjectId} 
+                onValueChange={setSelectedProjectId}
+                disabled={!selectedClientId || (selectedClientId === 'NEW_CLIENT' && !newClientNameInput.trim())}
+              >
+                <SelectTrigger id="project-select" className="bg-input text-foreground">
+                  <SelectValue placeholder="Select or Add Project" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover text-popover-foreground">
+                  {availableProjectOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                  {selectedClientId && selectedClientId !== 'NEW_CLIENT' && (
+                     <SelectItem value="NEW_PROJECT">Add New Project for {allClients.find(c=>c.id === selectedClientId)?.name || 'Selected Client'}...</SelectItem>
+                  )}
+                   {selectedClientId === 'NEW_CLIENT' && newClientNameInput.trim() && (
+                     <SelectItem value="NEW_PROJECT">Add New Project for {newClientNameInput.trim()}...</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedProjectId === 'NEW_PROJECT' && (
+              <div>
+                <Label htmlFor="new-project-name" className="text-foreground">New Project Name</Label>
+                <Input 
+                  id="new-project-name" 
+                  value={newProjectNameInput} 
+                  onChange={(e) => setNewProjectNameInput(e.target.value)} 
+                  placeholder="Enter new project's name"
+                  className="bg-input text-foreground" 
+                />
+              </div>
+            )}
+
             <div>
               <Label htmlFor="service-details" className="text-foreground">Service Details</Label>
               <Input 
@@ -324,3 +403,4 @@ export function CalendarView({
     </div>
   );
 }
+

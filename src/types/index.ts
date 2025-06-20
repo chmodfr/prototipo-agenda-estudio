@@ -4,11 +4,13 @@ export interface Booking {
   id: string;
   startTime: Date;
   endTime: Date;
-  clientId: string; // Added
+  clientId: string; 
   clientName: string; 
-  projectId: string; // Added
+  projectId: string; 
+  projectName?: string; // Optional: for easier display if needed
   service?: string;
   title?: string; 
+  price?: number; // Price for this specific booking slot/duration
 }
 
 export interface TimeSlot {
@@ -25,7 +27,7 @@ export interface DayWithSlots {
 
 export interface ClientMonthlyMetrics {
   totalHours: number;
-  pricePerHour: number; 
+  pricePerHour: number; // This will now be an effective/average rate if project rates varied
   totalAmount: number;  
 }
 

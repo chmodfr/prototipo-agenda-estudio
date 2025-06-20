@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ShareDialog } from '@/components/share/share-dialog';
 import { exportCalendarAsImage, exportCalendarAsPdf } from '@/lib/export';
 import { 
-  getBookingsForWeek, // Updated function name
+  getBookingsForWeek,
   getWeekDates, 
   calculateMonthlyClientMetrics, 
   calculateBookingDurationInHours,
@@ -17,8 +17,8 @@ import {
   CALENDAR_END_HOUR 
 } from '@/lib/calendar-utils';
 import type { Booking, MonthlyRecipe } from '@/types';
-import type { ClientDocument, ProjectDocument, BookingDocument } from '@/types/firestore'; // Import Firestore types
-import { sampleClients, sampleProjects, sampleBookings as allSampleBookingDocuments } from '@/lib/sample-firestore-data'; // Import all sample data
+import type { ClientDocument, ProjectDocument, BookingDocument } from '@/types/firestore';
+import { sampleClients, sampleProjects, sampleBookings as allSampleBookingDocuments } from '@/lib/sample-firestore-data';
 import { Share2, Image as ImageIcon, FileText, BarChart3, ChevronDown, ChevronUp, CheckCircle, XCircle, MinusCircle, CheckSquare } from 'lucide-react';
 
 export default function HomePage() {
@@ -26,43 +26,60 @@ export default function HomePage() {
   const calendarExportId = "calendar-table-export-area"; 
 
   const [displayedDate, setDisplayedDate] = useState(new Date());
-  // State for UI-facing Booking objects
   const [bookings, setBookings] = useState<Booking[]>([]); 
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
 
-  // Use all clients and projects from sample data
-  const [allClientsData] = useState<ClientDocument[]>(sampleClients);
-  const [allProjectsData] = useState<ProjectDocument[]>(sampleProjects);
-  // Store all BookingDocuments and derive UI bookings from them
+  const [allClientsData, setAllClientsData] = useState<ClientDocument[]>(sampleClients);
+  const [allProjectsData, setAllProjectsData] = useState<ProjectDocument[]>(sampleProjects);
   const [allBookingDocuments, setAllBookingDocuments] = useState<BookingDocument[]>(allSampleBookingDocuments);
 
 
   useEffect(() => {
-    // Initialize UI bookings based on the initial displayed date's week
-    // and the comprehensive list of BookingDocuments and ClientDocuments
     const currentWeekDates = getWeekDates(displayedDate);
-    setBookings(getBookingsForWeek(currentWeekDates, allBookingDocuments, allClientsData));
-  }, [displayedDate, allBookingDocuments, allClientsData]);
+    setBookings(getBookingsForWeek(currentWeekDates, allBookingDocuments, allClientsData, allProjectsData));
+  }, [displayedDate, allBookingDocuments, allClientsData, allProjectsData]);
 
   const handleNewBookings = (newlyConfirmedUiBookings: Booking[]) => {
-    // Convert UI Bookings to BookingDocuments (simplified for mock, in real app this is a DB operation)
+    // Convert UI Bookings to BookingDocuments
     const newBookingDocuments: BookingDocument[] = newlyConfirmedUiBookings.map(uiBooking => ({
       id: uiBooking.id,
       clientId: uiBooking.clientId,
       projectId: uiBooking.projectId,
       startTime: uiBooking.startTime,
       endTime: uiBooking.endTime,
-      duration: calculateBookingDurationInHours(uiBooking), // Calculate duration for the document
+      duration: calculateBookingDurationInHours(uiBooking),
     }));
     
-    // Update the master list of BookingDocuments
     setAllBookingDocuments(prevDocs => [...prevDocs, ...newBookingDocuments]);
     
-    // The useEffect above will re-calculate and set the UI `bookings`
+    // Check if new clients or projects were created (based on temporary IDs)
+    // In a real app, you'd add them to Firestore and then refetch or update state.
+    // For this mock, we'll add them to our local state if they have temp IDs.
+    newlyConfirmedUiBookings.forEach(uiBooking => {
+      if (uiBooking.clientId.startsWith('new-client-')) {
+        const existingClient = allClientsData.find(c => c.id === uiBooking.clientId);
+        if (!existingClient) {
+          setAllClientsData(prev => [...prev, {id: uiBooking.clientId, name: uiBooking.clientName, phone: 'N/A'}]);
+        }
+      }
+      if (uiBooking.projectId.startsWith('new-project-')) {
+         const existingProject = allProjectsData.find(p => p.id === uiBooking.projectId);
+         if (!existingProject) {
+            const projectName = uiBooking.title?.split(' / ')[1]?.split(' - ')[0] || 'New Project';
+            setAllProjectsData(prev => [...prev, {
+              id: uiBooking.projectId, 
+              clientId: uiBooking.clientId, 
+              name: projectName, 
+              billingType: 'personalizado', // Default for new projects from calendar
+              customRate: 0, // Default
+              createdAt: new Date()
+            }]);
+         }
+      }
+    });
   };
   
   const monthlyRecipe: MonthlyRecipe = useMemo(() => {
-    // Pass allClientsData for client name lookup
     return calculateMonthlyClientMetrics(bookings, displayedDate, allClientsData);
   }, [bookings, displayedDate, allClientsData]);
 
@@ -120,8 +137,8 @@ export default function HomePage() {
             bookings={bookings} 
             onNewBookingsAdd={handleNewBookings}
             calendarId={calendarExportId}
-            allClients={allClientsData} // Pass all clients
-            allProjects={allProjectsData} // Pass all projects
+            allClients={allClientsData} 
+            allProjects={allProjectsData} 
           />
 
           <div className="mt-12 p-6 bg-card rounded-lg shadow-lg">
@@ -149,15 +166,22 @@ export default function HomePage() {
                       <div className="mt-3 pt-3 border-t border-border/50">
                         <h4 className="text-sm font-semibold text-muted-foreground mb-2">Bookings:</h4>
                         <ul className="space-y-1 text-xs">
-                          {bookings // Use the UI bookings state which has clientName directly
+                          {bookings
                             .filter(b => b.clientName === clientName && format(new Date(b.startTime), 'yyyy-MM') === format(displayedDate, 'yyyy-MM'))
                             .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                            .map(booking => (
-                              <li key={booking.id} className="p-2 bg-muted/30 rounded">
-                                <span className="font-medium">{format(new Date(booking.startTime), 'MMM d, HH:mm')}</span> - {booking.service || 'Session'} 
-                                ({calculateBookingDurationInHours(booking).toFixed(1)} hrs)
-                              </li>
-                          ))}
+                            .map(booking => {
+                               const project = allProjectsData.find(p => p.id === booking.projectId);
+                               const projectName = project ? project.name : "Unknown Project";
+                               return (
+                                <li key={booking.id} className="p-2 bg-muted/30 rounded">
+                                    <span className="font-medium">{format(new Date(booking.startTime), 'MMM d, HH:mm')}</span> - 
+                                    Project: {projectName} - 
+                                    {booking.service || 'Session'} 
+                                    ({calculateBookingDurationInHours(booking).toFixed(1)} hrs)
+                                    {booking.price && ` - R$${booking.price.toFixed(2)}`}
+                                </li>
+                               );
+                            })}
                         </ul>
                       </div>
                     )}
@@ -179,3 +203,4 @@ export default function HomePage() {
     </Suspense>
   );
 }
+
