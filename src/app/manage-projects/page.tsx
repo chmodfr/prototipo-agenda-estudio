@@ -355,168 +355,166 @@ export default function ManageProjectsClientsPage() {
   }
 
   return (
-    <Suspense fallback={<div className="p-8">Carregando página de gerenciamento...</div>}>
-      <div className="flex flex-col min-h-screen bg-background text-foreground">
-        <main className="flex-grow container mx-auto py-8 px-4">
-          <div className="mb-6">
-            <Link href="/" passHref>
-              <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para o Calendário
-              </Button>
-            </Link>
-          </div>
-
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-bold text-primary-foreground">Gerenciar Clientes e Projetos</h2>
-            <Button onClick={() => handleOpenClientModal()} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Cliente
+    <div className="flex flex-col min-h-screen bg-background text-foreground">
+      <main className="flex-grow container mx-auto py-8 px-4">
+        <div className="mb-6">
+          <Link href="/" passHref>
+            <Button variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para o Calendário
             </Button>
-          </div>
+          </Link>
+        </div>
 
-          {clients.filter(c => c.id !== 'client_internal_000').length === 0 && <p className="text-muted-foreground">Nenhum cliente encontrado. Comece adicionando um!</p>}
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold text-primary-foreground">Gerenciar Clientes e Projetos</h2>
+          <Button onClick={() => handleOpenClientModal()} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+            <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Cliente
+          </Button>
+        </div>
 
-          {clients.filter(c => c.id !== 'client_internal_000').map(client => (
-            <Card key={client.id} className="mb-8 shadow-lg">
-              <CardHeader className="bg-card/50 rounded-t-lg">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-2xl text-primary">{client.name}</CardTitle>
-                    <CardDescription className="text-muted-foreground">{client.phone}</CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={() => handleOpenClientModal(client)} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-                      <Pencil className="mr-1 h-4 w-4" /> Editar Cliente
-                    </Button>
-                     <Button onClick={() => handleOpenDeleteClientDialog(client.id)} variant="destructive" size="sm">
-                      <Trash2 className="mr-1 h-4 w-4" /> Excluir Cliente
-                    </Button>
-                  </div>
+        {clients.filter(c => c.id !== 'client_internal_000').length === 0 && <p className="text-muted-foreground">Nenhum cliente encontrado. Comece adicionando um!</p>}
+
+        {clients.filter(c => c.id !== 'client_internal_000').map(client => (
+          <Card key={client.id} className="mb-8 shadow-lg">
+            <CardHeader className="bg-card/50 rounded-t-lg">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-2xl text-primary">{client.name}</CardTitle>
+                  <CardDescription className="text-muted-foreground">{client.phone}</CardDescription>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-semibold text-primary-foreground">Projetos</h3>
-                  <Button onClick={() => handleOpenProjectModal(null, client.id)} variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Projeto para {client.name.split(' ')[0]}
+                <div className="flex gap-2">
+                  <Button onClick={() => handleOpenClientModal(client)} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
+                    <Pencil className="mr-1 h-4 w-4" /> Editar Cliente
+                  </Button>
+                   <Button onClick={() => handleOpenDeleteClientDialog(client.id)} variant="destructive" size="sm">
+                    <Trash2 className="mr-1 h-4 w-4" /> Excluir Cliente
                   </Button>
                 </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-primary-foreground">Projetos</h3>
+                <Button onClick={() => handleOpenProjectModal(null, client.id)} variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Projeto para {client.name.split(' ')[0]}
+                </Button>
+              </div>
 
-                {projects.filter(p => p.clientId === client.id && p.id !== 'project_general_calendar').length === 0 && (
-                  <p className="text-muted-foreground">Nenhum projeto para este cliente ainda.</p>
-                )}
+              {projects.filter(p => p.clientId === client.id && p.id !== 'project_general_calendar').length === 0 && (
+                <p className="text-muted-foreground">Nenhum projeto para este cliente ainda.</p>
+              )}
 
-                {projects
-                  .filter(p => p.clientId === client.id && p.id !== 'project_general_calendar')
-                  .map(project => {
-                    const projectBookings = bookings.filter(b => b.projectId === project.id);
-                    const projectMetrics = calculateProjectCost(projectBookings, project);
-                    
-                    const totalBookedHours = projectMetrics?.totalHours || 0;
-                    const targetHours = project.targetHours || 0;
-                    const progressPercentage = targetHours > 0 ? Math.min((totalBookedHours / targetHours) * 100, 100) : 0;
-                    const isCompleted = targetHours > 0 && totalBookedHours >= targetHours;
-                    const status = isCompleted ? 'Completo' : 'Em Execução';
+              {projects
+                .filter(p => p.clientId === client.id && p.id !== 'project_general_calendar')
+                .map(project => {
+                  const projectBookings = bookings.filter(b => b.projectId === project.id);
+                  const projectMetrics = calculateProjectCost(projectBookings, project);
+                  
+                  const totalBookedHours = projectMetrics?.totalHours || 0;
+                  const targetHours = project.targetHours || 0;
+                  const progressPercentage = targetHours > 0 ? Math.min((totalBookedHours / targetHours) * 100, 100) : 0;
+                  const isCompleted = targetHours > 0 && totalBookedHours >= targetHours;
+                  const status = isCompleted ? 'Completo' : 'Em Execução';
 
-                    return (
-                      <Accordion type="single" collapsible className="w-full mb-4 border border-border rounded-md" key={project.id}>
-                        <AccordionItem value={project.id} className="border-b-0">
-                          <AccordionTrigger className="hover:no-underline bg-secondary/30 hover:bg-secondary/50 px-4 py-3 rounded-t-md">
-                            <div className="flex justify-between w-full items-center">
-                              <span className="font-medium text-lg text-primary-foreground">{project.name}</span>
-                              <span className="text-xs text-muted-foreground pr-2">
-                                Criado: {format(new Date(project.createdAt), 'd MMM, yyyy', { locale: ptBR })}
+                  return (
+                    <Accordion type="single" collapsible className="w-full mb-4 border border-border rounded-md" key={project.id}>
+                      <AccordionItem value={project.id} className="border-b-0">
+                        <AccordionTrigger className="hover:no-underline bg-secondary/30 hover:bg-secondary/50 px-4 py-3 rounded-t-md">
+                          <div className="flex justify-between w-full items-center">
+                            <span className="font-medium text-lg text-primary-foreground">{project.name}</span>
+                            <span className="text-xs text-muted-foreground pr-2">
+                              Criado: {format(new Date(project.createdAt), 'd MMM, yyyy', { locale: ptBR })}
+                            </span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-4 py-4 bg-card rounded-b-md">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                             <div className="space-y-1">
+                                <p className="text-sm"><strong className="text-muted-foreground">Tipo de Cobrança:</strong> <span className="font-medium">{project.billingType}</span></p>
+                                {project.billingType === 'pacote' && project.pacoteSelecionado && (
+                                <p className="text-sm"><strong className="text-muted-foreground">Pacote:</strong> <span className="font-medium">{project.pacoteSelecionado}</span></p>
+                                )}
+                                {projectMetrics && (
+                                  <>
+                                    <p className="text-sm"><strong className="text-muted-foreground">Valor por Hora:</strong> <span className="font-medium">R${projectMetrics.pricePerHour.toFixed(2)}</span></p>
+                                    <p className="text-sm"><strong className="text-muted-foreground">Valor Total Atual:</strong> <span className="font-semibold text-accent">R${projectMetrics.totalAmount.toFixed(2)}</span></p>
+                                  </>
+                                )}
+                            </div>
+                            <div className="flex md:justify-end items-start gap-2">
+                                <Button onClick={() => handleOpenProjectModal(project, client.id)} variant="outline" size="sm" className="border-accent text-accent hover:bg-accent hover:text-accent-foreground">
+                                <Pencil className="mr-1 h-4 w-4" /> Editar Projeto
+                                </Button>
+                                <Button onClick={() => handleOpenDeleteProjectDialog(project.id)} variant="destructive" size="sm" className="bg-destructive/80 hover:bg-destructive">
+                                <Trash2 className="mr-1 h-4 w-4" /> Excluir Projeto
+                                </Button>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 space-y-3 p-3 bg-secondary/20 rounded-md">
+                            <div className="flex justify-between items-center">
+                              <p className="text-sm font-medium">Status do Projeto:</p>
+                              <span className={`text-sm font-semibold px-2 py-1 rounded-full ${isCompleted ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
+                                  {status}
                               </span>
                             </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="px-4 py-4 bg-card rounded-b-md">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                               <div className="space-y-1">
-                                  <p className="text-sm"><strong className="text-muted-foreground">Tipo de Cobrança:</strong> <span className="font-medium">{project.billingType}</span></p>
-                                  {project.billingType === 'pacote' && project.pacoteSelecionado && (
-                                  <p className="text-sm"><strong className="text-muted-foreground">Pacote:</strong> <span className="font-medium">{project.pacoteSelecionado}</span></p>
-                                  )}
-                                  {projectMetrics && (
-                                    <>
-                                      <p className="text-sm"><strong className="text-muted-foreground">Valor por Hora:</strong> <span className="font-medium">R${projectMetrics.pricePerHour.toFixed(2)}</span></p>
-                                      <p className="text-sm"><strong className="text-muted-foreground">Valor Total Atual:</strong> <span className="font-semibold text-accent">R${projectMetrics.totalAmount.toFixed(2)}</span></p>
-                                    </>
-                                  )}
-                              </div>
-                              <div className="flex md:justify-end items-start gap-2">
-                                  <Button onClick={() => handleOpenProjectModal(project, client.id)} variant="outline" size="sm" className="border-accent text-accent hover:bg-accent hover:text-accent-foreground">
-                                  <Pencil className="mr-1 h-4 w-4" /> Editar Projeto
-                                  </Button>
-                                  <Button onClick={() => handleOpenDeleteProjectDialog(project.id)} variant="destructive" size="sm" className="bg-destructive/80 hover:bg-destructive">
-                                  <Trash2 className="mr-1 h-4 w-4" /> Excluir Projeto
-                                  </Button>
-                              </div>
+                            <div>
+                                <div className="flex justify-between text-sm text-muted-foreground mb-1">
+                                    <span>Progresso das Horas</span>
+                                    <span>{totalBookedHours.toFixed(1)} / {targetHours}h</span>
+                                </div>
+                                <Progress value={progressPercentage} className="h-2" />
                             </div>
-                            
-                            <div className="mt-4 space-y-3 p-3 bg-secondary/20 rounded-md">
-                              <div className="flex justify-between items-center">
-                                <p className="text-sm font-medium">Status do Projeto:</p>
-                                <span className={`text-sm font-semibold px-2 py-1 rounded-full ${isCompleted ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
-                                    {status}
-                                </span>
-                              </div>
-                              <div>
-                                  <div className="flex justify-between text-sm text-muted-foreground mb-1">
-                                      <span>Progresso das Horas</span>
-                                      <span>{totalBookedHours.toFixed(1)} / {targetHours}h</span>
-                                  </div>
-                                  <Progress value={progressPercentage} className="h-2" />
-                              </div>
-                              {isCompleted && (
-                                  <div className="pt-2 flex justify-end">
-                                      <Button 
-                                          onClick={() => handleGenerateReceipt(project, client)}
-                                          variant="outline"
-                                          size="sm"
-                                          className="border-green-400 text-green-400 hover:bg-green-500 hover:text-white"
-                                      >
-                                          <FileText className="mr-2 h-4 w-4" />
-                                          Gerar Recibo
-                                      </Button>
-                                  </div>
-                              )}
-                            </div>
-
-                            <h4 className="text-md font-semibold mt-6 mb-2 text-primary-foreground">Agendamentos para este projeto:</h4>
-                            {projectBookings.length > 0 ? (
-                              <div className="overflow-x-auto rounded-md border border-border">
-                                <Table>
-                                  <TableHeader className="bg-muted/30">
-                                    <TableRow>
-                                      <TableHead className="text-foreground">Horário de Início</TableHead>
-                                      <TableHead className="text-foreground">Horário de Fim</TableHead>
-                                      <TableHead className="text-foreground text-right">Duração (hrs)</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {projectBookings
-                                      .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                                      .map(booking => (
-                                        <TableRow key={booking.id} className="hover:bg-muted/10">
-                                          <TableCell>{format(new Date(booking.startTime), 'd MMM, yyyy HH:mm', { locale: ptBR })}</TableCell>
-                                          <TableCell>{format(new Date(booking.endTime), 'd MMM, yyyy HH:mm', { locale: ptBR })}</TableCell>
-                                          <TableCell className="text-right">{booking.duration.toFixed(1)}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                            ) : (
-                              <p className="text-muted-foreground">Nenhum agendamento para este projeto ainda.</p>
+                            {isCompleted && (
+                                <div className="pt-2 flex justify-end">
+                                    <Button 
+                                        onClick={() => handleGenerateReceipt(project, client)}
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-green-400 text-green-400 hover:bg-green-500 hover:text-white"
+                                    >
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        Gerar Recibo
+                                    </Button>
+                                </div>
                             )}
-                          </AccordionContent>
-                        </AccordionItem>
-                      </Accordion>
-                  )})}
-              </CardContent>
-            </Card>
-          ))}
-        </main>
-      </div>
+                          </div>
+
+                          <h4 className="text-md font-semibold mt-6 mb-2 text-primary-foreground">Agendamentos para este projeto:</h4>
+                          {projectBookings.length > 0 ? (
+                            <div className="overflow-x-auto rounded-md border border-border">
+                              <Table>
+                                <TableHeader className="bg-muted/30">
+                                  <TableRow>
+                                    <TableHead className="text-foreground">Horário de Início</TableHead>
+                                    <TableHead className="text-foreground">Horário de Fim</TableHead>
+                                    <TableHead className="text-foreground text-right">Duração (hrs)</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {projectBookings
+                                    .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                                    .map(booking => (
+                                      <TableRow key={booking.id} className="hover:bg-muted/10">
+                                        <TableCell>{format(new Date(booking.startTime), 'd MMM, yyyy HH:mm', { locale: ptBR })}</TableCell>
+                                        <TableCell>{format(new Date(booking.endTime), 'd MMM, yyyy HH:mm', { locale: ptBR })}</TableCell>
+                                        <TableCell className="text-right">{booking.duration.toFixed(1)}</TableCell>
+                                      </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground">Nenhum agendamento para este projeto ainda.</p>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                )})}
+            </CardContent>
+          </Card>
+        ))}
+      </main>
 
       {/* Client Add/Edit Modal */}
       <Dialog open={isClientModalOpen} onOpenChange={setIsClientModalOpen}>
@@ -691,6 +689,6 @@ export default function ManageProjectsClientsPage() {
             </DialogFooter>
         </DialogContent>
     </Dialog>
-    </Suspense>
+    </div>
   );
 }

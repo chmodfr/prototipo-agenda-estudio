@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Inter } from 'next/font/google';
+import { Suspense } from 'react';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -19,7 +20,9 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${inter.variable} dark`}>
       <head />
       <body className="font-body antialiased">
-        {children}
+        <Suspense fallback={<div className="flex h-screen w-full items-center justify-center">Carregando...</div>}>
+          {children}
+        </Suspense>
         <Toaster />
       </body>
     </html>
