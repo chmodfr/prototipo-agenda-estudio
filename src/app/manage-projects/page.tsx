@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { format } from 'date-fns';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -29,7 +30,7 @@ import {
 // Import sample data directly
 import { sampleClients, sampleProjects, sampleBookings } from '@/lib/sample-firestore-data';
 import type { ClientDocument, ProjectDocument, BookingDocument } from '@/types/firestore';
-import { Pencil, PlusCircle, Trash2 } from 'lucide-react';
+import { Pencil, PlusCircle, Trash2, ArrowLeft } from 'lucide-react';
 
 export default function ManageProjectsClientsPage() {
   // Use sample data directly
@@ -62,6 +63,14 @@ export default function ManageProjectsClientsPage() {
     <Suspense fallback={<div className="p-8">Loading management page...</div>}>
       <div className="flex flex-col min-h-screen bg-background text-foreground">
         <main className="flex-grow container mx-auto py-8 px-4">
+          <div className="mb-6">
+            <Link href="/" passHref>
+              <Button variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Calendar
+              </Button>
+            </Link>
+          </div>
+
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-3xl font-bold text-primary-foreground">Manage Clients & Projects</h2>
             <Button onClick={() => alert('Add new client functionality not yet implemented.')} className="bg-accent hover:bg-accent/90 text-accent-foreground">
