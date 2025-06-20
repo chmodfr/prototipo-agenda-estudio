@@ -5,6 +5,10 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -28,37 +32,184 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-// Import sample data directly
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useToast } from '@/hooks/use-toast';
 import { sampleClients, sampleProjects, sampleBookings } from '@/lib/sample-firestore-data';
-import type { ClientDocument, ProjectDocument, BookingDocument } from '@/types/firestore';
+import type { ClientDocument, ProjectDocument, BookingDocument, BillingType, PacoteType } from '@/types/firestore';
 import { Pencil, PlusCircle, Trash2, ArrowLeft } from 'lucide-react';
 
+// Zod Schemas for form validation
+const clientSchema = z.object({
+  name: z.string().min(2, { message: "O nome do cliente é obrigatório." }),
+  phone: z.string().min(10, { message: "O telefone deve ter pelo menos 10 dígitos." }),
+});
+
+const projectSchema = z.object({
+  name: z.string().min(2, { message: "O nome do projeto é obrigatório." }),
+  billingType: z.enum(['pacote', 'personalizado'], { required_error: "Selecione um tipo de cobrança." }),
+  pacoteSelecionado: z.enum(["Avulso", "Pacote 10h", "Pacote 20h", "Pacote 40h"]).optional(),
+  customRate: z.coerce.number().min(0, "O valor deve ser positivo.").optional(),
+}).refine(data => {
+  if (data.billingType === 'pacote' && !data.pacoteSelecionado) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Por favor, selecione um pacote.",
+  path: ["pacoteSelecionado"],
+}).refine(data => {
+  if (data.billingType === 'personalizado' && (data.customRate === undefined || data.customRate === null)) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Por favor, insira um valor por hora.",
+  path: ["customRate"],
+});
+
+
 export default function ManageProjectsClientsPage() {
-  // Use sample data directly
-  const clients: ClientDocument[] = sampleClients;
-  const projects: ProjectDocument[] = sampleProjects;
-  const bookings: BookingDocument[] = sampleBookings;
+  const { toast } = useToast();
+  
+  // Component State
+  const [clients, setClients] = useState<ClientDocument[]>(sampleClients);
+  const [projects, setProjects] = useState<ProjectDocument[]>(sampleProjects);
+  const [bookings, setBookings] = useState<BookingDocument[]>(sampleBookings);
+  
+  // Modal & Dialog State
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isDeleteClientDialogOpen, setIsDeleteClientDialogOpen] = useState(false);
+  const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
 
-  const handleEditClient = (clientId: string) => {
-    alert(`A funcionalidade de edição para o cliente ID: ${clientId} ainda não foi implementada.`);
+  // State for tracking what is being edited/deleted
+  const [editingClient, setEditingClient] = useState<ClientDocument | null>(null);
+  const [editingProject, setEditingProject] = useState<ProjectDocument | null>(null);
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [addingProjectForClientId, setAddingProjectForClientId] = useState<string | null>(null);
+
+  // React Hook Form instances
+  const clientForm = useForm<z.infer<typeof clientSchema>>({
+    resolver: zodResolver(clientSchema),
+    defaultValues: { name: "", phone: "" },
+  });
+
+  const projectForm = useForm<z.infer<typeof projectSchema>>({
+    resolver: zodResolver(projectSchema),
+    defaultValues: { billingType: 'personalizado' },
+  });
+  const watchedBillingType = projectForm.watch('billingType');
+
+
+  // Modal Open/Close Handlers
+  const handleOpenClientModal = (client: ClientDocument | null = null) => {
+    setEditingClient(client);
+    clientForm.reset(client || { name: "", phone: "" });
+    setIsClientModalOpen(true);
   };
 
-  const handleAddProject = (clientId: string) => {
-    alert(`A funcionalidade de adicionar projeto para o cliente ID: ${clientId} ainda não foi implementada.`);
+  const handleOpenProjectModal = (project: ProjectDocument | null, clientId: string) => {
+    setEditingProject(project);
+    setAddingProjectForClientId(clientId);
+    projectForm.reset(project || { name: "", billingType: 'personalizado' });
+    setIsProjectModalOpen(true);
+  };
+  
+  const handleOpenDeleteClientDialog = (clientId: string) => {
+    setDeletingClientId(clientId);
+    setIsDeleteClientDialogOpen(true);
   };
 
-  const handleEditProject = (projectId: string) => {
-    alert(`A funcionalidade de edição para o projeto ID: ${projectId} ainda não foi implementada.`);
+  const handleOpenDeleteProjectDialog = (projectId: string) => {
+    setDeletingProjectId(projectId);
+    setIsDeleteProjectDialogOpen(true);
   };
 
-  const handleDeleteClient = (clientId: string) => {
-    alert(`A funcionalidade de exclusão para o cliente ID: ${clientId} ainda não foi implementada.`);
+  // CRUD Operations
+  const onClientSubmit = (data: z.infer<typeof clientSchema>) => {
+    if (editingClient) { // Editing existing client
+      setClients(clients.map(c => c.id === editingClient.id ? { ...c, ...data } : c));
+      toast({ title: "Cliente Atualizado!", description: `O cliente "${data.name}" foi atualizado.` });
+    } else { // Adding new client
+      const newClient = { id: `client_${Date.now()}`, ...data };
+      setClients([...clients, newClient]);
+      toast({ title: "Cliente Adicionado!", description: `O cliente "${data.name}" foi criado.` });
+    }
+    setIsClientModalOpen(false);
   };
 
-  const handleDeleteProject = (projectId: string) => {
-    alert(`A funcionalidade de exclusão para o projeto ID: ${projectId} ainda não foi implementada.`);
+  const onProjectSubmit = (data: z.infer<typeof projectSchema>) => {
+    if (editingProject) { // Editing existing project
+      const updatedProject = { ...editingProject, ...data };
+      setProjects(projects.map(p => p.id === editingProject.id ? updatedProject : p));
+      toast({ title: "Projeto Atualizado!", description: `O projeto "${data.name}" foi atualizado.` });
+    } else if (addingProjectForClientId) { // Adding new project
+      const newProject = { 
+        id: `project_${Date.now()}`, 
+        clientId: addingProjectForClientId,
+        createdAt: new Date(),
+        ...data 
+      };
+      setProjects([...projects, newProject]);
+      toast({ title: "Projeto Adicionado!", description: `O projeto "${data.name}" foi criado.` });
+    }
+    setIsProjectModalOpen(false);
   };
 
+  const confirmDeleteClient = () => {
+    if (!deletingClientId) return;
+    const clientName = clients.find(c => c.id === deletingClientId)?.name;
+    // Cascade delete: remove client, their projects, and their bookings
+    const clientProjectIds = projects.filter(p => p.clientId === deletingClientId).map(p => p.id);
+    setBookings(bookings.filter(b => b.clientId !== deletingClientId));
+    setProjects(projects.filter(p => p.clientId !== deletingClientId));
+    setClients(clients.filter(c => c.id !== deletingClientId));
+    
+    toast({ title: "Cliente Excluído!", description: `O cliente "${clientName}" e todos os seus dados foram removidos.`, variant: 'destructive' });
+    setIsDeleteClientDialogOpen(false);
+    setDeletingClientId(null);
+  };
+
+  const confirmDeleteProject = () => {
+    if (!deletingProjectId) return;
+    const projectName = projects.find(p => p.id === deletingProjectId)?.name;
+    // Cascade delete: remove project and its bookings
+    setBookings(bookings.filter(b => b.projectId !== deletingProjectId));
+    setProjects(projects.filter(p => p.id !== deletingProjectId));
+
+    toast({ title: "Projeto Excluído!", description: `O projeto "${projectName}" e seus agendamentos foram removidos.`, variant: 'destructive' });
+    setIsDeleteProjectDialogOpen(false);
+    setDeletingProjectId(null);
+  };
 
   return (
     <Suspense fallback={<div className="p-8">Carregando página de gerenciamento...</div>}>
@@ -74,14 +225,14 @@ export default function ManageProjectsClientsPage() {
 
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-3xl font-bold text-primary-foreground">Gerenciar Clientes e Projetos</h2>
-            <Button onClick={() => alert('A funcionalidade de adicionar novo cliente ainda não foi implementada.')} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button onClick={() => handleOpenClientModal()} className="bg-accent hover:bg-accent/90 text-accent-foreground">
               <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Cliente
             </Button>
           </div>
 
           {clients.filter(c => c.id !== 'client_internal_000').length === 0 && <p className="text-muted-foreground">Nenhum cliente encontrado. Comece adicionando um!</p>}
 
-          {clients.filter(c => c.id !== 'client_internal_000').map(client => ( // Exclude internal client from display
+          {clients.filter(c => c.id !== 'client_internal_000').map(client => (
             <Card key={client.id} className="mb-8 shadow-lg">
               <CardHeader className="bg-card/50 rounded-t-lg">
                 <div className="flex justify-between items-start">
@@ -90,10 +241,10 @@ export default function ManageProjectsClientsPage() {
                     <CardDescription className="text-muted-foreground">{client.phone}</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={() => handleEditClient(client.id)} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
+                    <Button onClick={() => handleOpenClientModal(client)} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
                       <Pencil className="mr-1 h-4 w-4" /> Editar Cliente
                     </Button>
-                     <Button onClick={() => handleDeleteClient(client.id)} variant="destructive" size="sm">
+                     <Button onClick={() => handleOpenDeleteClientDialog(client.id)} variant="destructive" size="sm">
                       <Trash2 className="mr-1 h-4 w-4" /> Excluir Cliente
                     </Button>
                   </div>
@@ -102,17 +253,17 @@ export default function ManageProjectsClientsPage() {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-semibold text-primary-foreground">Projetos</h3>
-                  <Button onClick={() => handleAddProject(client.id)} variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Button onClick={() => handleOpenProjectModal(null, client.id)} variant="default" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground">
                     <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Projeto para {client.name.split(' ')[0]}
                   </Button>
                 </div>
 
-                {projects.filter(p => p.clientId === client.id && p.id !== 'project_general_calendar').length === 0 && ( // Exclude general project
+                {projects.filter(p => p.clientId === client.id && p.id !== 'project_general_calendar').length === 0 && (
                   <p className="text-muted-foreground">Nenhum projeto para este cliente ainda.</p>
                 )}
 
                 {projects
-                  .filter(p => p.clientId === client.id && p.id !== 'project_general_calendar') // Exclude general project
+                  .filter(p => p.clientId === client.id && p.id !== 'project_general_calendar')
                   .map(project => (
                     <Accordion type="single" collapsible className="w-full mb-4 border border-border rounded-md" key={project.id}>
                       <AccordionItem value={project.id} className="border-b-0">
@@ -136,10 +287,10 @@ export default function ManageProjectsClientsPage() {
                                 )}
                             </div>
                             <div className="flex md:justify-end items-start gap-2">
-                                <Button onClick={() => handleEditProject(project.id)} variant="outline" size="sm" className="border-accent text-accent hover:bg-accent hover:text-accent-foreground">
+                                <Button onClick={() => handleOpenProjectModal(project, client.id)} variant="outline" size="sm" className="border-accent text-accent hover:bg-accent hover:text-accent-foreground">
                                 <Pencil className="mr-1 h-4 w-4" /> Editar Projeto
                                 </Button>
-                                <Button onClick={() => handleDeleteProject(project.id)} variant="destructive" size="sm" className="bg-destructive/80 hover:bg-destructive">
+                                <Button onClick={() => handleOpenDeleteProjectDialog(project.id)} variant="destructive" size="sm" className="bg-destructive/80 hover:bg-destructive">
                                 <Trash2 className="mr-1 h-4 w-4" /> Excluir Projeto
                                 </Button>
                             </div>
@@ -182,6 +333,143 @@ export default function ManageProjectsClientsPage() {
           ))}
         </main>
       </div>
+
+      {/* Client Add/Edit Modal */}
+      <Dialog open={isClientModalOpen} onOpenChange={setIsClientModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingClient ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</DialogTitle>
+            <DialogDescription>
+              {editingClient ? 'Atualize as informações do cliente.' : 'Preencha as informações do novo cliente.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={clientForm.handleSubmit(onClientSubmit)}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">Nome</Label>
+                <Input id="name" {...clientForm.register('name')} className="col-span-3" />
+              </div>
+              {clientForm.formState.errors.name && <p className="col-span-4 text-right text-destructive text-sm">{clientForm.formState.errors.name.message}</p>}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone" className="text-right">Telefone</Label>
+                <Input id="phone" {...clientForm.register('phone')} className="col-span-3" />
+              </div>
+              {clientForm.formState.errors.phone && <p className="col-span-4 text-right text-destructive text-sm">{clientForm.formState.errors.phone.message}</p>}
+            </div>
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="secondary">Cancelar</Button></DialogClose>
+              <Button type="submit">Salvar</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Project Add/Edit Modal */}
+      <Dialog open={isProjectModalOpen} onOpenChange={setIsProjectModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingProject ? 'Editar Projeto' : 'Adicionar Novo Projeto'}</DialogTitle>
+            <DialogDescription>
+              Preencha os detalhes do projeto abaixo.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={projectForm.handleSubmit(onProjectSubmit)}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="projectName">Nome do Projeto</Label>
+                <Input id="projectName" {...projectForm.register('name')} />
+                {projectForm.formState.errors.name && <p className="text-destructive text-sm">{projectForm.formState.errors.name.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de Cobrança</Label>
+                <Controller
+                  control={projectForm.control}
+                  name="billingType"
+                  render={({ field }) => (
+                    <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="personalizado" id="r-custom"/>
+                        <Label htmlFor="r-custom">Personalizado</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="pacote" id="r-package"/>
+                        <Label htmlFor="r-package">Pacote</Label>
+                      </div>
+                    </RadioGroup>
+                  )}
+                />
+              </div>
+
+              {watchedBillingType === 'personalizado' && (
+                <div className="space-y-2">
+                  <Label htmlFor="customRate">Valor por Hora (R$)</Label>
+                  <Input id="customRate" type="number" {...projectForm.register('customRate')} />
+                   {projectForm.formState.errors.customRate && <p className="text-destructive text-sm">{projectForm.formState.errors.customRate.message}</p>}
+                </div>
+              )}
+
+              {watchedBillingType === 'pacote' && (
+                <div className="space-y-2">
+                  <Label>Pacote Selecionado</Label>
+                  <Controller
+                    control={projectForm.control}
+                    name="pacoteSelecionado"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger><SelectValue placeholder="Selecione um pacote" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Avulso">Avulso (R$350/hr)</SelectItem>
+                          <SelectItem value="Pacote 10h">Pacote 10h (R$260/hr)</SelectItem>
+                          <SelectItem value="Pacote 20h">Pacote 20h (R$230/hr)</SelectItem>
+                          <SelectItem value="Pacote 40h">Pacote 40h (R$160/hr)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {projectForm.formState.errors.pacoteSelecionado && <p className="text-destructive text-sm">{projectForm.formState.errors.pacoteSelecionado.message}</p>}
+                </div>
+              )}
+            </div>
+             <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="secondary">Cancelar</Button></DialogClose>
+                <Button type="submit">Salvar Projeto</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Client Confirmation */}
+      <AlertDialog open={isDeleteClientDialogOpen} onOpenChange={setIsDeleteClientDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o cliente, junto com todos os seus projetos e agendamentos associados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteClient}>Continuar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Project Confirmation */}
+      <AlertDialog open={isDeleteProjectDialogOpen} onOpenChange={setIsDeleteProjectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o projeto e todos os seus agendamentos associados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteProject}>Continuar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Suspense>
   );
 }
