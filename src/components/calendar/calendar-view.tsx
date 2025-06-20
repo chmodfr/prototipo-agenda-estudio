@@ -100,8 +100,6 @@ export function CalendarView({
     const { isBooked, isBuffer } = checkSlotAvailability(slotTime, bookings);
     
     if (isBooked || isBuffer) {
-        // If a slot is already booked or a buffer, it cannot be selected.
-        // If it was mistakenly in selectedSlots (e.g., due to race condition, though unlikely here), remove it.
         setSelectedSlots(prevSelected => prevSelected.filter(s => s.getTime() !== slotTime.getTime()));
         toast({
           title: 'Slot Unavailable',
@@ -116,7 +114,6 @@ export function CalendarView({
       if (index > -1) {
         return prevSelected.filter(s => s.getTime() !== slotTime.getTime()); 
       } else {
-        // Sort selected slots by time to ensure logical booking order
         const newSelection = [...prevSelected, slotTime];
         newSelection.sort((a, b) => a.getTime() - b.getTime());
         return newSelection;
@@ -145,7 +142,6 @@ export function CalendarView({
 
     if (!clientNameInput || clientNameInput.trim() === "") {
       toast({ title: "Booking Cancelled", description: "Client name is required.", variant: "destructive" });
-      // Do not clear selectedSlots here, user might want to try again with valid name
       return;
     }
     const finalClientName = clientNameInput.trim();
@@ -169,11 +165,8 @@ export function CalendarView({
         toast({ title: "Booking Cancelled", description: "Price input was cancelled.", variant: "destructive" });
         return;
     }
-    // Distribute price evenly if multiple slots are part of the same booking transaction.
-    // Or, one could assign the full price to the first slot and 0 to subsequent if they are one contiguous block.
-    // For simplicity, we'll assign the price per slot for now.
-    const pricePerSlot = selectedSlots.length > 0 ? totalPriceForSession / selectedSlots.length : 0;
 
+    const pricePerSlot = selectedSlots.length > 0 ? totalPriceForSession / selectedSlots.length : 0;
 
     const newlyConfirmedBookings: Booking[] = selectedSlots.map(slotTimeToBook => ({
       id: `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`,
