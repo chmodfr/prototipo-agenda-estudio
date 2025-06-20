@@ -100,10 +100,6 @@ export function CalendarView({
     const { isBooked, isBuffer } = checkSlotAvailability(slotTime, bookings);
     
     if (isBooked || isBuffer) {
-        // If it's already selected, clicking again should deselect it IF it wasn't originally booked/buffer
-        // However, the primary guard is to prevent selection of booked/buffer slots.
-        // The current logic correctly deselects if it was previously selected and now becomes unavailable
-        // due to external booking changes, or if it was simply a mistake.
         setSelectedSlots(prevSelected => prevSelected.filter(s => s.getTime() !== slotTime.getTime()));
         toast({
           title: 'Slot Unavailable',
@@ -145,7 +141,11 @@ export function CalendarView({
     }
 
     if (!clientNameInput || clientNameInput.trim() === "") {
-      toast({ title: "Booking Cancelled", description: "Client name is required. Please try again and enter a client name.", variant: "destructive" });
+      toast({ 
+        title: "Client Name Missing", 
+        description: "You must enter a client name in the pop-up dialog to complete the booking. Please try again.", 
+        variant: "destructive" 
+      });
       return;
     }
     const finalClientName = clientNameInput.trim();
@@ -154,7 +154,7 @@ export function CalendarView({
     let finalServiceDetails = "Session";
     if (serviceDetailsInput && serviceDetailsInput.trim() !== "") {
       finalServiceDetails = serviceDetailsInput.trim();
-    } else if (serviceDetailsInput === null) { // User cancelled the prompt
+    } else if (serviceDetailsInput === null) { 
         toast({ title: "Booking Cancelled", description: "Service details entry was cancelled.", variant: "destructive" });
         return;
     }
@@ -166,7 +166,7 @@ export function CalendarView({
         totalPriceForSession = parseFloat(priceInput);
         if (isNaN(totalPriceForSession) || totalPriceForSession < 0) {
             toast({ title: "Booking Update", description: "Price was not a valid number. Defaulting to $0 for this booking.", variant: "destructive" });
-            totalPriceForSession = 0; // Default to 0 if invalid, but continue booking
+            totalPriceForSession = 0; 
         }
     } else { 
         toast({ title: "Booking Cancelled", description: "Price input was cancelled.", variant: "destructive" });
@@ -265,3 +265,4 @@ export function CalendarView({
   );
 }
 
+    
