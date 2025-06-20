@@ -14,9 +14,12 @@ import {
   isSaturday,
   isSunday,
   nextMonday,
-  isMonday
+  isMonday,
+  startOfMonth,
+  endOfMonth,
+  isSameMonth
 } from 'date-fns';
-import type { Booking, TimeSlot } from '@/types';
+import type { Booking, TimeSlot, MonthlyRecipe, ClientMonthlyMetrics } from '@/types';
 
 const BUFFER_HOURS = 1;
 export const CALENDAR_START_HOUR = 9;
@@ -42,21 +45,15 @@ export function generateTimeSlots(date: Date): Date[] {
 }
 
 export function checkSlotAvailability(
-  slotTime: Date, // Start time of the 1-hour slot
+  slotTime: Date, 
   bookings: Booking[]
 ): { isBooked: boolean; isBuffer: boolean; bookingDetails?: Booking } {
   const slotEndTime = addHours(slotTime, 1);
 
-  // Phase 1: Check for direct booking
-  // A slot is directly booked if its time range overlaps with any booking's time range.
   for (const booking of bookings) {
     const bookingStartTime = booking.startTime;
     const bookingEndTime = booking.endTime;
 
-    // Direct overlap conditions:
-    // 1. Slot starts during the booking.
-    // 2. Slot ends during the booking.
-    // 3. Booking is entirely contained within the slot.
     if (
       (slotTime >= bookingStartTime && slotTime < bookingEndTime) ||
       (slotEndTime > bookingStartTime && slotEndTime <= bookingEndTime) ||
@@ -66,9 +63,6 @@ export function checkSlotAvailability(
     }
   }
 
-  // Phase 2: Check for buffer zone, only if not directly booked
-  // A slot is a buffer if it's adjacent (within BUFFER_HOURS) to a booking,
-  // but not overlapping the booking itself.
   for (const booking of bookings) {
     const bookingStartTime = booking.startTime;
     const bookingEndTime = booking.endTime;
@@ -76,11 +70,9 @@ export function checkSlotAvailability(
     const bufferBeforeStart = subHours(bookingStartTime, BUFFER_HOURS);
     const bufferAfterEnd = addHours(bookingEndTime, BUFFER_HOURS);
 
-    // Check if the slot falls into the buffer period BEFORE the booking
     if (slotTime >= bufferBeforeStart && slotTime < bookingStartTime) {
       return { isBooked: false, isBuffer: true, bookingDetails: booking };
     }
-    // Check if the slot falls into the buffer period AFTER the booking
     if (slotTime >= bookingEndTime && slotTime < bufferAfterEnd) {
       return { isBooked: false, isBuffer: true, bookingDetails: booking };
     }
@@ -89,7 +81,6 @@ export function checkSlotAvailability(
   return { isBooked: false, isBuffer: false };
 }
 
-// Mock bookings for demonstration
 export function getMockBookings(weekDates: Date[]): Booking[] {
   const bookings: Booking[] = [];
   if (weekDates.length === 0) return bookings;
@@ -100,8 +91,8 @@ export function getMockBookings(weekDates: Date[]): Booking[] {
 
   bookings.push({
     id: '1',
-    startTime: setHours(setMinutes(monday,0), 10), // Monday 10:00
-    endTime: setHours(setMinutes(monday,0), 11),   // Monday 11:00
+    startTime: setHours(setMinutes(monday,0), 10), 
+    endTime: setHours(setMinutes(monday,0), 11),   
     clientName: 'Alice Wonderland',
     service: 'Vocal Recording',
     title: 'Alice - Vocals',
@@ -109,8 +100,8 @@ export function getMockBookings(weekDates: Date[]): Booking[] {
   });
   bookings.push({
     id: '2',
-    startTime: setHours(setMinutes(tuesday,0), 14), // Tuesday 14:00
-    endTime: setHours(setMinutes(tuesday,0), 16),   // Tuesday 16:00 (2 hour session)
+    startTime: setHours(setMinutes(tuesday,0), 14), 
+    endTime: setHours(setMinutes(tuesday,0), 16),   
     clientName: 'Bob The Builder',
     service: 'Mixing Session',
     title: 'Bob - Mix',
@@ -118,8 +109,8 @@ export function getMockBookings(weekDates: Date[]): Booking[] {
   });
    bookings.push({
     id: '3',
-    startTime: setHours(setMinutes(thursday,0), 17), // Thursday 17:00
-    endTime: setHours(setMinutes(thursday,0), 18),   // Thursday 18:00
+    startTime: setHours(setMinutes(thursday,0), 17), 
+    endTime: setHours(setMinutes(thursday,0), 18),   
     clientName: 'Charlie Chaplin',
     service: 'Podcast Production',
     title: 'Charlie - Podcast',
@@ -127,13 +118,49 @@ export function getMockBookings(weekDates: Date[]): Booking[] {
   });
    bookings.push({
     id: '4',
-    startTime: setHours(setMinutes(thursday,0), 9), // Thursday 9:00
-    endTime: setHours(setMinutes(thursday,0), 11),   // Thursday 11:00 (2 hour session)
+    startTime: setHours(setMinutes(thursday,0), 9), 
+    endTime: setHours(setMinutes(thursday,0), 11),   
     clientName: 'Diana Prince',
     service: 'Mastering',
     title: 'Diana - Master',
     price: 200
   });
+  bookings.push({ // Booking for Alice in the same month to test aggregation
+    id: '5',
+    startTime: setHours(setMinutes(tuesday,0), 10), 
+    endTime: setHours(setMinutes(tuesday,0), 12),   
+    clientName: 'Alice Wonderland',
+    service: 'ADR Session',
+    title: 'Alice - ADR',
+    price: 120
+  });
+
 
   return bookings;
+}
+
+export function calculateBookingDurationInHours(booking: Booking): number {
+  if (!booking.startTime || !booking.endTime) return 0;
+  const durationMillis = booking.endTime.getTime() - booking.startTime.getTime();
+  return durationMillis / (1000 * 60 * 60);
+}
+
+export function calculateMonthlyClientMetrics(
+  bookings: Booking[],
+  targetDateForMonth: Date
+): MonthlyRecipe {
+  const clientMetrics: MonthlyRecipe = {};
+
+  bookings.forEach(booking => {
+    if (isSameMonth(booking.startTime, targetDateForMonth) && booking.clientName) {
+      if (!clientMetrics[booking.clientName]) {
+        clientMetrics[booking.clientName] = { totalHours: 0, totalPrice: 0 };
+      }
+      const duration = calculateBookingDurationInHours(booking);
+      clientMetrics[booking.clientName].totalHours += duration;
+      clientMetrics[booking.clientName].totalPrice += booking.price || 0;
+    }
+  });
+
+  return clientMetrics;
 }

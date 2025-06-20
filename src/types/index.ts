@@ -4,10 +4,10 @@ export interface Booking {
   id: string;
   startTime: Date;
   endTime: Date;
-  clientName?: string;
+  clientName: string; // Made mandatory for recipe calculation
   service?: string;
   title?: string; // Generic title for the booking event
-  price?: number; // Added price field
+  price?: number; 
 }
 
 export interface TimeSlot {
@@ -16,10 +16,17 @@ export interface TimeSlot {
   isBuffer: boolean;
   bookingDetails?: Booking;
   // isSelected will be handled by an extended type in CalendarView (DisplayTimeSlot)
-  // or added directly to CalendarSlotProps for simplicity if not needed broadly in calendarData structure.
 }
 
 export interface DayWithSlots {
   date: Date;
-  slots: TimeSlot[]; // This will be array of DisplayTimeSlot in CalendarView's state/memo
+  slots: TimeSlot[]; 
 }
+
+// For the monthly recipe display
+export interface ClientMonthlyMetrics {
+  totalHours: number;
+  totalPrice: number;
+}
+
+export type MonthlyRecipe = Record<string, ClientMonthlyMetrics>;

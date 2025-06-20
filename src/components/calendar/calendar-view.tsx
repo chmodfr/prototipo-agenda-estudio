@@ -10,7 +10,6 @@ import {
   getWeekDates,
   generateTimeSlots,
   checkSlotAvailability,
-  getMockBookings,
   CALENDAR_START_HOUR,
   CALENDAR_END_HOUR
 } from '@/lib/calendar-utils';
@@ -21,18 +20,39 @@ interface DisplayTimeSlot extends TimeSlotType {
   isSelected: boolean;
 }
 
-export function CalendarView() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+interface CalendarViewProps {
+  initialDate: Date;
+  onDateChange: (date: Date) => void;
+  bookings: Booking[];
+  onNewBookingsAdd: (newBookings: Booking[]) => void;
+  calendarId: string;
+}
+
+export function CalendarView({ 
+  initialDate, 
+  onDateChange, 
+  bookings, 
+  onNewBookingsAdd,
+  calendarId 
+}: CalendarViewProps) {
+  const [currentDateInternal, setCurrentDateInternal] = useState(initialDate);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<Date[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    const newWeekDates = getWeekDates(currentDate);
+    setCurrentDateInternal(initialDate);
+  }, [initialDate]);
+
+  useEffect(() => {
+    const newWeekDates = getWeekDates(currentDateInternal);
     setWeekDates(newWeekDates);
-    setBookings(getMockBookings(newWeekDates));
-  }, [currentDate]);
+  }, [currentDateInternal]);
+  
+  const existingClientNames = useMemo(() => {
+    const names = new Set(bookings.map(b => b.clientName).filter(Boolean) as string[]);
+    return Array.from(names);
+  }, [bookings]);
 
   const calendarData = useMemo((): { date: Date; slots: DisplayTimeSlot[] }[] => {
     return weekDates.map(date => {
@@ -56,19 +76,22 @@ export function CalendarView() {
     return calendarData[0].slots.map(slot => format(slot.time, 'HH:mm'));
   }, [calendarData]);
 
-  const handlePrevWeek = () => {
-    setCurrentDate(prev => new Date(prev.setDate(prev.getDate() - 7)));
+  const updateDate = (newDate: Date) => {
+    setCurrentDateInternal(newDate);
+    onDateChange(newDate); // Notify parent of date change
     setSelectedSlots([]); 
+  };
+
+  const handlePrevWeek = () => {
+    updateDate(new Date(currentDateInternal.setDate(currentDateInternal.getDate() - 7)));
   };
 
   const handleNextWeek = () => {
-    setCurrentDate(prev => new Date(prev.setDate(prev.getDate() + 7)));
-    setSelectedSlots([]); 
+    updateDate(new Date(currentDateInternal.setDate(currentDateInternal.getDate() + 7)));
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date());
-    setSelectedSlots([]); 
+    updateDate(new Date());
   };
 
   const handleSlotClick = (slotTime: Date) => {
@@ -98,22 +121,31 @@ export function CalendarView() {
       });
       return;
     }
+    
+    let clientNameInput: string | null = null;
+    let promptMessage = "Enter client name:";
+    if (existingClientNames.length > 0) {
+      promptMessage = `Enter client name (e.g., ${existingClientNames.join(", ")}) or type a new name:`;
+      clientNameInput = window.prompt(promptMessage, existingClientNames[0] || "New Client");
+    } else {
+      clientNameInput = window.prompt(promptMessage, "New Client");
+    }
 
-    const clientName = window.prompt("Enter client name:", "New Client");
-    if (!clientName) {
+    if (!clientNameInput) {
       toast({ title: "Booking Cancelled", description: "Client name is required.", variant: "destructive" });
-      setSelectedSlots([]); // Clear selection if booking is cancelled
+      setSelectedSlots([]); 
       return;
     }
+    const finalClientName = clientNameInput; // Ensure it's a string
 
     const serviceDetails = window.prompt("Enter service details (e.g., Vocal Recording, Mixing):", "Session");
     if (!serviceDetails) {
       toast({ title: "Booking Cancelled", description: "Service details are required.", variant: "destructive" });
-      setSelectedSlots([]); // Clear selection
+      setSelectedSlots([]); 
       return;
     }
 
-    const priceInput = window.prompt("Enter price for the session(s):", "50");
+    const priceInput = window.prompt("Enter price for the total session(s):", "50");
     let price = 0;
     if (priceInput !== null) {
         price = parseFloat(priceInput);
@@ -121,28 +153,27 @@ export function CalendarView() {
             toast({ title: "Invalid Price", description: "Price was not a valid number. Defaulting to 0.", variant: "destructive" });
             price = 0;
         }
-    } else { // User cancelled the price prompt
+    } else { 
         toast({ title: "Booking Cancelled", description: "Price input was cancelled.", variant: "destructive" });
-        setSelectedSlots([]); // Clear selection
+        setSelectedSlots([]); 
         return;
     }
 
-
-    const newBookings: Booking[] = selectedSlots.map(slotTimeToBook => ({
+    const newlyConfirmedBookings: Booking[] = selectedSlots.map(slotTimeToBook => ({
       id: `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       startTime: slotTimeToBook,
-      endTime: addHours(slotTimeToBook, 1), // Assuming 1-hour slots for now
-      clientName: clientName,
+      endTime: addHours(slotTimeToBook, 1), 
+      clientName: finalClientName,
       service: serviceDetails,
-      title: `${clientName} - ${serviceDetails}`,
-      price: price,
+      title: `${finalClientName} - ${serviceDetails}`,
+      price: price / selectedSlots.length, // Distribute price if multiple slots are booked as one transaction
     }));
 
-    setBookings(prevBookings => [...prevBookings, ...newBookings]);
+    onNewBookingsAdd(newlyConfirmedBookings); // Notify parent
     setSelectedSlots([]); 
     toast({
       title: 'Booking Confirmed!',
-      description: `${newBookings.length} slot(s) booked for ${clientName}. Buffers will now reflect these bookings.`,
+      description: `${newlyConfirmedBookings.length} slot(s) booked for ${finalClientName}. Buffers will now reflect these bookings.`,
     });
   };
 
@@ -151,7 +182,7 @@ export function CalendarView() {
   }
 
   return (
-    <div id="calendar-table-export-area" className="p-4 md:p-6 bg-card rounded-lg shadow-xl">
+    <div id={calendarId} className="p-4 md:p-6 bg-card rounded-lg shadow-xl">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <div className="flex gap-2">
           <Button variant="outline" onClick={handlePrevWeek} aria-label="Previous week">
