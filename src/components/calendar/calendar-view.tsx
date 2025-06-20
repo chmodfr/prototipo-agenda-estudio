@@ -21,6 +21,7 @@ import {
   checkSlotAvailability,
 } from '@/lib/calendar-utils';
 import type { Booking, TimeSlot as TimeSlotType } from '@/types';
+import type { ClientDocument, ProjectDocument } from '@/types/firestore'; // Import Firestore types
 import { useToast } from '@/hooks/use-toast';
 
 interface DisplayTimeSlot extends TimeSlotType {
@@ -30,9 +31,11 @@ interface DisplayTimeSlot extends TimeSlotType {
 interface CalendarViewProps {
   initialDate: Date;
   onDateChange: (date: Date) => void;
-  bookings: Booking[];
+  bookings: Booking[]; // UI-facing Booking type
   onNewBookingsAdd: (newBookings: Booking[]) => void;
   calendarId: string;
+  allClients: ClientDocument[]; // Pass all clients for dropdown
+  allProjects: ProjectDocument[]; // Pass all projects for default project ID
 }
 
 export function CalendarView({ 
@@ -40,17 +43,18 @@ export function CalendarView({
   onDateChange, 
   bookings, 
   onNewBookingsAdd,
-  calendarId 
+  calendarId,
+  allClients,
+  allProjects,
 }: CalendarViewProps) {
   const [currentDateInternal, setCurrentDateInternal] = useState(initialDate);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<Date[]>([]);
   const { toast } = useToast();
 
-  const [selectedClient, setSelectedClient] = useState<string>('');
-  const [newClientName, setNewClientName] = useState<string>('');
+  const [selectedClientName, setSelectedClientName] = useState<string>(''); // Stores the name for selection
+  const [newClientNameInput, setNewClientNameInput] = useState<string>('');
   const [serviceDetails, setServiceDetails] = useState<string>('Session');
-  // HOURLY_RATE and bookingPrice state removed
 
   useEffect(() => {
     setCurrentDateInternal(initialDate);
@@ -61,10 +65,9 @@ export function CalendarView({
     setWeekDates(newWeekDates);
   }, [currentDateInternal]);
   
-  const existingClientNames = useMemo(() => {
-    const names = new Set(bookings.map(b => b.clientName).filter(Boolean).map(name => name.trim()));
-    return Array.from(names).sort();
-  }, [bookings]);
+  const existingClientOptions = useMemo(() => {
+    return allClients.map(client => ({ value: client.id, label: client.name }));
+  }, [allClients]);
 
   const calendarData = useMemo((): { date: Date; slots: DisplayTimeSlot[] }[] => {
     return weekDates.map(date => {
@@ -92,8 +95,8 @@ export function CalendarView({
     setCurrentDateInternal(newDate);
     onDateChange(newDate); 
     setSelectedSlots([]); 
-    setSelectedClient('');
-    setNewClientName('');
+    setSelectedClientName('');
+    setNewClientNameInput('');
     setServiceDetails('Session');
   };
 
@@ -117,8 +120,6 @@ export function CalendarView({
     const { isBooked, isBuffer } = checkSlotAvailability(slotTime, bookings);
     
     if (isBooked || isBuffer) {
-        // If a slot is already booked/buffer, ensure it's not in selectedSlots
-        // (though UI should prevent selecting these, this is a safeguard)
         setSelectedSlots(prevSelected => prevSelected.filter(s => s.getTime() !== slotTime.getTime()));
         toast({
           title: 'Slot Unavailable',
@@ -131,10 +132,8 @@ export function CalendarView({
     setSelectedSlots(prevSelected => {
       const index = prevSelected.findIndex(s => s.getTime() === slotTime.getTime());
       if (index > -1) {
-        // Deselect if already selected
         return prevSelected.filter(s => s.getTime() !== slotTime.getTime()); 
       } else {
-        // Add to selection and sort
         const newSelection = [...prevSelected, slotTime];
         newSelection.sort((a, b) => a.getTime() - b.getTime());
         return newSelection;
@@ -152,44 +151,58 @@ export function CalendarView({
       return;
     }
     
-    let finalClientName = '';
-    if (selectedClient === 'NEW_CLIENT') {
-      finalClientName = newClientName.trim();
-      if (!finalClientName) {
+    let finalClientId = '';
+    let finalClientNameToDisplay = '';
+
+    if (selectedClientName === 'NEW_CLIENT') {
+      finalClientNameToDisplay = newClientNameInput.trim();
+      if (!finalClientNameToDisplay) {
         toast({ title: "Client Name Missing", description: "Please enter a name for the new client.", variant: "destructive" });
         return;
       }
+      finalClientId = `new-client-${Date.now()}`; // Temporary ID for mock data
+      // In a real app, you'd create the client in Firestore and get a real ID.
+      // And potentially update the allClients list in the parent.
     } else {
-      finalClientName = selectedClient;
-      if (!finalClientName) {
-        toast({ title: "Client Not Selected", description: "Please select a client or add a new one.", variant: "destructive" });
+      const client = allClients.find(c => c.name === selectedClientName);
+      if (!client) {
+         toast({ title: "Client Not Selected", description: "Please select an existing client.", variant: "destructive" });
         return;
       }
+      finalClientId = client.id;
+      finalClientNameToDisplay = client.name;
     }
 
     const finalServiceDetails = serviceDetails.trim() || "Session";
+    
+    const generalProject = allProjects.find(p => p.id === 'project_general_calendar');
+    if (!generalProject) {
+        toast({ title: "Configuration Error", description: "Default project for calendar bookings not found.", variant: "destructive" });
+        return;
+    }
+    const finalProjectId = generalProject.id;
     
     const newlyConfirmedBookings: Booking[] = selectedSlots.map(slotTimeToBook => ({
       id: `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       startTime: slotTimeToBook,
       endTime: addHours(slotTimeToBook, 1), 
-      clientName: finalClientName,
+      clientId: finalClientId,
+      clientName: finalClientNameToDisplay, 
+      projectId: finalProjectId,
       service: finalServiceDetails,
-      title: `${finalClientName} - ${finalServiceDetails}`,
-      // Price is no longer set here; it will be calculated by the tiered system
+      title: `${finalClientNameToDisplay} - ${finalServiceDetails}`,
     }));
 
     onNewBookingsAdd(newlyConfirmedBookings); 
     
-    // Reset selection and form fields
     setSelectedSlots([]); 
-    setSelectedClient('');
-    setNewClientName('');
+    setSelectedClientName('');
+    setNewClientNameInput('');
     setServiceDetails('Session');
 
     toast({
       title: 'Booking Confirmed!',
-      description: `${newlyConfirmedBookings.length} slot(s) booked for ${finalClientName}.`,
+      description: `${newlyConfirmedBookings.length} slot(s) booked for ${finalClientNameToDisplay}.`,
     });
   };
 
@@ -219,7 +232,6 @@ export function CalendarView({
         <div className="min-w-[180px]"></div> {/* Spacer */}
       </div>
 
-      {/* Calendar Grid */}
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse border border-border/50">
           <thead className="bg-secondary/50">
@@ -255,33 +267,32 @@ export function CalendarView({
         </table>
       </div>
 
-      {/* Booking Details Form - appears when slots are selected */}
       {selectedSlots.length > 0 && (
         <div className="mt-8 p-6 bg-secondary/30 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-4 text-primary-foreground">Booking Details for {selectedSlots.length} Slot(s)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="client-select" className="text-foreground">Client</Label>
-              <Select value={selectedClient} onValueChange={setSelectedClient}>
+              <Select value={selectedClientName} onValueChange={setSelectedClientName}>
                 <SelectTrigger id="client-select" className="bg-input text-foreground">
                   <SelectValue placeholder="Select or Add Client" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover text-popover-foreground">
-                  {existingClientNames.map(name => (
-                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  {existingClientOptions.map(option => (
+                    <SelectItem key={option.value} value={option.label}>{option.label}</SelectItem>
                   ))}
                   <SelectItem value="NEW_CLIENT">Add New Client...</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {selectedClient === 'NEW_CLIENT' && (
+            {selectedClientName === 'NEW_CLIENT' && (
               <div>
                 <Label htmlFor="new-client-name" className="text-foreground">New Client Name</Label>
                 <Input 
                   id="new-client-name" 
-                  value={newClientName} 
-                  onChange={(e) => setNewClientName(e.target.value)} 
+                  value={newClientNameInput} 
+                  onChange={(e) => setNewClientNameInput(e.target.value)} 
                   placeholder="Enter new client's name"
                   className="bg-input text-foreground" 
                 />
@@ -299,7 +310,6 @@ export function CalendarView({
               />
             </div>
             
-            {/* Price input has been removed */}
           </div>
           <Button 
             onClick={handleConfirmBooking} 
@@ -314,4 +324,3 @@ export function CalendarView({
     </div>
   );
 }
-    

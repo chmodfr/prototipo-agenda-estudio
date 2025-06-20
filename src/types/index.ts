@@ -4,10 +4,11 @@ export interface Booking {
   id: string;
   startTime: Date;
   endTime: Date;
+  clientId: string; // Added
   clientName: string; 
+  projectId: string; // Added
   service?: string;
   title?: string; 
-  // price field is removed; pricing is now tiered based on monthly client hours or project-specific rates
 }
 
 export interface TimeSlot {
@@ -28,7 +29,7 @@ export interface ClientMonthlyMetrics {
   totalAmount: number;  
 }
 
-export type MonthlyRecipe = Record<string, ClientMonthlyMetrics>;
+export type MonthlyRecipe = Record<string, ClientMonthlyMetrics>; // Key is clientName for display
 
 export interface ProjectCostMetrics {
   totalHours: number;

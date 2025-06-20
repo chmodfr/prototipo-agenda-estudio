@@ -17,10 +17,13 @@ import {
   isMonday,
   startOfMonth,
   endOfMonth,
-  isSameMonth
+  isSameMonth,
+  isSameDay,
+  startOfDay,
+  endOfDay
 } from 'date-fns';
 import type { Booking, TimeSlot, MonthlyRecipe, ClientMonthlyMetrics, ProjectCostMetrics } from '@/types';
-import type { ProjectDocument, BookingDocument, PacoteType } from '@/types/firestore';
+import type { ProjectDocument, BookingDocument, ClientDocument, PacoteType } from '@/types/firestore';
 
 const BUFFER_HOURS = 1;
 export const CALENDAR_START_HOUR = 9;
@@ -36,26 +39,25 @@ export function getWeekDates(currentDate: Date = new Date()): Date[] {
 }
 
 export function generateTimeSlots(date: Date): Date[] {
-  const startOfDay = setHours(setMinutes(setSeconds(date, 0), 0), CALENDAR_START_HOUR);
-  const endOfDay = setHours(setMinutes(setSeconds(date, 0), 0), CALENDAR_END_HOUR -1); // up to 18:00 start slot for 18-19
+  const startCalDay = setHours(setMinutes(setSeconds(date, 0), 0), CALENDAR_START_HOUR);
+  const endCalDay = setHours(setMinutes(setSeconds(date, 0), 0), CALENDAR_END_HOUR -1); 
   
   return eachHourOfInterval({
-    start: startOfDay,
-    end: endOfDay,
+    start: startCalDay,
+    end: endCalDay,
   });
 }
 
 export function checkSlotAvailability(
   slotTime: Date, 
-  bookings: Booking[]
+  bookings: Booking[] // These are UI-facing Booking objects
 ): { isBooked: boolean; isBuffer: boolean; bookingDetails?: Booking } {
   const slotEndTime = addHours(slotTime, 1);
 
   for (const booking of bookings) {
-    const bookingStartTime = booking.startTime;
-    const bookingEndTime = booking.endTime;
+    const bookingStartTime = new Date(booking.startTime); // Ensure Date objects
+    const bookingEndTime = new Date(booking.endTime);   // Ensure Date objects
 
-    // Check if the slot is directly booked
     if (
       (slotTime >= bookingStartTime && slotTime < bookingEndTime) ||
       (slotEndTime > bookingStartTime && slotEndTime <= bookingEndTime) ||
@@ -65,12 +67,10 @@ export function checkSlotAvailability(
     }
   }
 
-  // Check if the slot is a buffer for another booking
   for (const booking of bookings) {
-    const bookingStartTime = booking.startTime;
-    const bookingEndTime = booking.endTime;
+    const bookingStartTime = new Date(booking.startTime);
+    const bookingEndTime = new Date(booking.endTime);
 
-    // Check if this booking itself is creating the conflict (already handled above)
     let isDirectlyBooked = false;
     if (
       (slotTime >= bookingStartTime && slotTime < bookingEndTime) ||
@@ -79,17 +79,14 @@ export function checkSlotAvailability(
     ) {
       isDirectlyBooked = true;
     }
-    if (isDirectlyBooked) continue; // Skip buffer check if it's the booking itself
-
+    if (isDirectlyBooked) continue; 
 
     const bufferBeforeStart = subHours(bookingStartTime, BUFFER_HOURS);
     const bufferAfterEnd = addHours(bookingEndTime, BUFFER_HOURS);
 
-    // Is the slot within the buffer period before the booking?
     if (slotTime >= bufferBeforeStart && slotTime < bookingStartTime) {
       return { isBooked: false, isBuffer: true, bookingDetails: booking };
     }
-    // Is the slot within the buffer period after the booking?
     if (slotTime >= bookingEndTime && slotTime < bufferAfterEnd) {
       return { isBooked: false, isBuffer: true, bookingDetails: booking };
     }
@@ -98,57 +95,36 @@ export function checkSlotAvailability(
   return { isBooked: false, isBuffer: false };
 }
 
-export function getMockBookings(weekDates: Date[]): Booking[] {
-  const bookings: Booking[] = [];
-  if (weekDates.length === 0) return bookings;
+export function getBookingsForWeek(
+  weekDates: Date[],
+  allBookingDocuments: BookingDocument[],
+  allClients: ClientDocument[]
+): Booking[] {
+  if (weekDates.length === 0) return [];
 
-  const monday = weekDates[0];
-  const tuesday = weekDates[1];
-  const thursday = weekDates[3];
+  const firstDayOfWeek = startOfDay(weekDates[0]);
+  const lastDayOfWeek = endOfDay(weekDates[weekDates.length - 1]);
 
-  bookings.push({
-    id: '1',
-    startTime: setHours(setMinutes(monday,0), 10), 
-    endTime: setHours(setMinutes(monday,0), 11),   
-    clientName: 'Alice Wonderland',
-    service: 'Vocal Recording',
-    title: 'Alice - Vocals',
-  });
-  bookings.push({
-    id: '2',
-    startTime: setHours(setMinutes(tuesday,0), 14), 
-    endTime: setHours(setMinutes(tuesday,0), 16),   
-    clientName: 'Bob The Builder',
-    service: 'Mixing Session',
-    title: 'Bob - Mix',
-  });
-   bookings.push({
-    id: '3',
-    startTime: setHours(setMinutes(thursday,0), 17), 
-    endTime: setHours(setMinutes(thursday,0), 18),   
-    clientName: 'Charlie Chaplin',
-    service: 'Podcast Production',
-    title: 'Charlie - Podcast',
-  });
-   bookings.push({
-    id: '4',
-    startTime: setHours(setMinutes(thursday,0), 9), 
-    endTime: setHours(setMinutes(thursday,0), 11),   
-    clientName: 'Diana Prince',
-    service: 'Mastering',
-    title: 'Diana - Master',
-  });
-  bookings.push({ 
-    id: '5',
-    startTime: setHours(setMinutes(tuesday,0), 10), 
-    endTime: setHours(setMinutes(tuesday,0), 12),   
-    clientName: 'Alice Wonderland',
-    service: 'ADR Session',
-    title: 'Alice - ADR',
-  });
-
-  return bookings;
+  return allBookingDocuments
+    .filter(doc => {
+      const bookingStartTime = new Date(doc.startTime);
+      return bookingStartTime >= firstDayOfWeek && bookingStartTime <= lastDayOfWeek;
+    })
+    .map(doc => {
+      const client = allClients.find(c => c.id === doc.clientId);
+      return {
+        id: doc.id,
+        startTime: new Date(doc.startTime),
+        endTime: new Date(doc.endTime),
+        clientId: doc.clientId,
+        clientName: client ? client.name : 'Unknown Client',
+        projectId: doc.projectId,
+        service: `Service for project ${doc.projectId}`, // Placeholder, can be improved
+        title: `${client ? client.name : 'Unknown'} - Project ${doc.projectId.slice(-4)}`, // Placeholder
+      };
+    });
 }
+
 
 export function calculateBookingDurationInHours(booking: Booking | BookingDocument): number {
   if (!booking.startTime || !booking.endTime) return 0;
@@ -171,28 +147,34 @@ export function calculateClientMonthlyInvoice(bookingDurations: number[]): Clien
 }
 
 export function calculateMonthlyClientMetrics(
-  bookings: Booking[], // Uses the simplified Booking type for UI display needs
-  targetDateForMonth: Date
+  allBookings: Booking[], // UI-facing Booking type, should now have clientId
+  targetDateForMonth: Date,
+  allClients: ClientDocument[] // Pass all clients to look up names
 ): MonthlyRecipe {
-  const clientBookingsForMonth: Record<string, number[]> = {};
+  const clientBookingsData: Record<string, { durations: number[], clientName: string }> = {};
 
-  bookings.forEach(booking => {
-    if (isSameMonth(booking.startTime, targetDateForMonth) && booking.clientName) {
-      if (!clientBookingsForMonth[booking.clientName]) {
-        clientBookingsForMonth[booking.clientName] = [];
+  allBookings.forEach(booking => {
+    if (isSameMonth(new Date(booking.startTime), targetDateForMonth) && booking.clientId) {
+      if (!clientBookingsData[booking.clientId]) {
+        const client = allClients.find(c => c.id === booking.clientId);
+        clientBookingsData[booking.clientId] = {
+          durations: [],
+          clientName: client ? client.name : `Client ID: ${booking.clientId}` // Fallback name
+        };
       }
       const duration = calculateBookingDurationInHours(booking);
-      clientBookingsForMonth[booking.clientName].push(duration);
+      clientBookingsData[booking.clientId].durations.push(duration);
     }
   });
 
   const monthlyRecipe: MonthlyRecipe = {};
-  for (const clientName in clientBookingsForMonth) {
-    const durations = clientBookingsForMonth[clientName];
-    if (durations && durations.length > 0) {
-        monthlyRecipe[clientName] = calculateClientMonthlyInvoice(durations);
+  for (const clientId in clientBookingsData) {
+    const data = clientBookingsData[clientId];
+    if (data.durations.length > 0) {
+        monthlyRecipe[data.clientName] = calculateClientMonthlyInvoice(data.durations);
     } else {
-        monthlyRecipe[clientName] = { totalHours: 0, pricePerHour: getTieredPricePerHour(0), totalAmount: 0 };
+        // This case should ideally not happen if clientBookingsData is populated correctly
+        monthlyRecipe[data.clientName] = { totalHours: 0, pricePerHour: getTieredPricePerHour(0), totalAmount: 0 };
     }
   }
   return monthlyRecipe;
@@ -214,7 +196,7 @@ export function calculateProjectCost(
   
   let totalHours = 0;
   for (const booking of projectBookings) {
-    totalHours += booking.duration; // Using pre-calculated duration from BookingDocument
+    totalHours += booking.duration; 
   }
 
   let pricePerHour: number;

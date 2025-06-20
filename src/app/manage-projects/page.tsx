@@ -26,13 +26,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+// Import sample data directly
 import { sampleClients, sampleProjects, sampleBookings } from '@/lib/sample-firestore-data';
 import type { ClientDocument, ProjectDocument, BookingDocument } from '@/types/firestore';
 import { Pencil, PlusCircle, Trash2 } from 'lucide-react';
 
 export default function ManageProjectsClientsPage() {
-  // For now, we'll use the sample data directly.
-  // In a real app, this would come from Firestore.
+  // Use sample data directly
   const clients: ClientDocument[] = sampleClients;
   const projects: ProjectDocument[] = sampleProjects;
   const bookings: BookingDocument[] = sampleBookings;
@@ -69,9 +69,9 @@ export default function ManageProjectsClientsPage() {
             </Button>
           </div>
 
-          {clients.length === 0 && <p className="text-muted-foreground">No clients found. Start by adding one!</p>}
+          {clients.filter(c => c.id !== 'client_internal_000').length === 0 && <p className="text-muted-foreground">No clients found. Start by adding one!</p>}
 
-          {clients.map(client => (
+          {clients.filter(c => c.id !== 'client_internal_000').map(client => ( // Exclude internal client from display
             <Card key={client.id} className="mb-8 shadow-lg">
               <CardHeader className="bg-card/50 rounded-t-lg">
                 <div className="flex justify-between items-start">
@@ -97,12 +97,12 @@ export default function ManageProjectsClientsPage() {
                   </Button>
                 </div>
 
-                {projects.filter(p => p.clientId === client.id).length === 0 && (
+                {projects.filter(p => p.clientId === client.id && p.id !== 'project_general_calendar').length === 0 && ( // Exclude general project
                   <p className="text-muted-foreground">No projects for this client yet.</p>
                 )}
 
                 {projects
-                  .filter(p => p.clientId === client.id)
+                  .filter(p => p.clientId === client.id && p.id !== 'project_general_calendar') // Exclude general project
                   .map(project => (
                     <Accordion type="single" collapsible className="w-full mb-4 border border-border rounded-md" key={project.id}>
                       <AccordionItem value={project.id} className="border-b-0">

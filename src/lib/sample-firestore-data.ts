@@ -12,10 +12,19 @@ export const sampleClients: ClientDocument[] = [
   { id: 'client_001', name: 'Estúdio Som & Arte', phone: '+55 11 98888-1111' },
   { id: 'client_002', name: 'Rádio Onda Sonora', phone: '+55 21 97777-2222' },
   { id: 'client_003', name: 'Produtora Visão Digital', phone: '+55 31 96666-3333' },
+  { id: 'client_internal_000', name: 'Studio Internal', phone: '+55 00 00000-0000'}
 ];
 
 // Sample Projects
 export const sampleProjects: ProjectDocument[] = [
+  {
+    id: 'project_general_calendar',
+    clientId: 'client_internal_000', // Linked to Studio Internal client
+    name: 'General Calendar Bookings',
+    billingType: 'personalizado', // Or a default package, depends on desired handling
+    customRate: 0, // This project might not have direct billing, or use a default
+    createdAt: new Date('2023-01-01T00:00:00Z'),
+  },
   {
     id: 'project_alpha_001',
     clientId: 'client_001', // Estúdio Som & Arte
@@ -59,6 +68,7 @@ export const sampleProjects: ProjectDocument[] = [
 ];
 
 // Sample Bookings
+// Ensure all bookings have a valid clientId and projectId
 export const sampleBookings: BookingDocument[] = [
   {
     id: 'booking_sg001',
@@ -115,5 +125,22 @@ export const sampleBookings: BookingDocument[] = [
     startTime: new Date('2024-02-05T09:00:00Z'),
     endTime: new Date('2024-02-05T11:00:00Z'), // 2 hours
     duration: calculateDuration(new Date('2024-02-05T09:00:00Z'), new Date('2024-02-05T11:00:00Z')),
+  },
+  // Add some bookings for project_general_calendar for testing calendar page initial load
+  {
+    id: 'booking_cal001',
+    clientId: 'client_001', // Example: Alice books a general slot
+    projectId: 'project_general_calendar',
+    startTime: new Date(new Date().setDate(new Date().getDate() + 1)), // Tomorrow 10 AM
+    endTime: new Date(new Date(new Date().setDate(new Date().getDate() + 1)).setHours(11,0,0,0)), // Tomorrow 11 AM
+    duration: 1,
+  },
+   {
+    id: 'booking_cal002',
+    clientId: 'client_002', // Example: Bob books a general slot
+    projectId: 'project_general_calendar',
+    startTime: new Date(new Date().setDate(new Date().getDate() + 2)), // Day after tomorrow 2 PM
+    endTime: new Date(new Date(new Date().setDate(new Date().getDate() + 2)).setHours(16,0,0,0)), // Day after tomorrow 4 PM
+    duration: 2,
   },
 ];
