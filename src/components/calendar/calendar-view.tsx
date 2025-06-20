@@ -10,8 +10,6 @@ import {
   getWeekDates,
   generateTimeSlots,
   checkSlotAvailability,
-  CALENDAR_START_HOUR,
-  CALENDAR_END_HOUR
 } from '@/lib/calendar-utils';
 import type { Booking, TimeSlot as TimeSlotType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -50,8 +48,8 @@ export function CalendarView({
   }, [currentDateInternal]);
   
   const existingClientNames = useMemo(() => {
-    const names = new Set(bookings.map(b => b.clientName).filter(Boolean) as string[]);
-    return Array.from(names);
+    const names = new Set(bookings.map(b => b.clientName).filter(Boolean).map(name => name.trim()));
+    return Array.from(names).sort();
   }, [bookings]);
 
   const calendarData = useMemo((): { date: Date; slots: DisplayTimeSlot[] }[] => {
@@ -78,16 +76,20 @@ export function CalendarView({
 
   const updateDate = (newDate: Date) => {
     setCurrentDateInternal(newDate);
-    onDateChange(newDate); // Notify parent of date change
+    onDateChange(newDate); 
     setSelectedSlots([]); 
   };
 
   const handlePrevWeek = () => {
-    updateDate(new Date(currentDateInternal.setDate(currentDateInternal.getDate() - 7)));
+    const newDate = new Date(currentDateInternal);
+    newDate.setDate(newDate.getDate() - 7);
+    updateDate(newDate);
   };
 
   const handleNextWeek = () => {
-    updateDate(new Date(currentDateInternal.setDate(currentDateInternal.getDate() + 7)));
+    const newDate = new Date(currentDateInternal);
+    newDate.setDate(newDate.getDate() + 7);
+    updateDate(newDate);
   };
 
   const handleToday = () => {
@@ -98,7 +100,14 @@ export function CalendarView({
     const { isBooked, isBuffer } = checkSlotAvailability(slotTime, bookings);
     
     if (isBooked || isBuffer) {
+        // If a slot is already booked or a buffer, it cannot be selected.
+        // If it was mistakenly in selectedSlots (e.g., due to race condition, though unlikely here), remove it.
         setSelectedSlots(prevSelected => prevSelected.filter(s => s.getTime() !== slotTime.getTime()));
+        toast({
+          title: 'Slot Unavailable',
+          description: 'This time slot is already booked or is a buffer.',
+          variant: 'destructive',
+        });
         return;
     }
 
@@ -107,7 +116,10 @@ export function CalendarView({
       if (index > -1) {
         return prevSelected.filter(s => s.getTime() !== slotTime.getTime()); 
       } else {
-        return [...prevSelected, slotTime]; 
+        // Sort selected slots by time to ensure logical booking order
+        const newSelection = [...prevSelected, slotTime];
+        newSelection.sort((a, b) => a.getTime() - b.getTime());
+        return newSelection;
       }
     });
   };
@@ -123,53 +135,57 @@ export function CalendarView({
     }
     
     let clientNameInput: string | null = null;
-    let promptMessage = "Enter client name:";
+    let promptMessage = "Enter client name";
     if (existingClientNames.length > 0) {
       promptMessage = `Enter client name (e.g., ${existingClientNames.join(", ")}) or type a new name:`;
-      clientNameInput = window.prompt(promptMessage, existingClientNames[0] || "New Client");
+      clientNameInput = window.prompt(promptMessage, existingClientNames[0] || "");
     } else {
-      clientNameInput = window.prompt(promptMessage, "New Client");
+      clientNameInput = window.prompt(promptMessage, "");
     }
 
-    if (!clientNameInput) {
+    if (!clientNameInput || clientNameInput.trim() === "") {
       toast({ title: "Booking Cancelled", description: "Client name is required.", variant: "destructive" });
-      setSelectedSlots([]); 
+      // Do not clear selectedSlots here, user might want to try again with valid name
       return;
     }
-    const finalClientName = clientNameInput; // Ensure it's a string
+    const finalClientName = clientNameInput.trim();
 
-    const serviceDetails = window.prompt("Enter service details (e.g., Vocal Recording, Mixing):", "Session");
-    if (!serviceDetails) {
+    const serviceDetailsInput = window.prompt("Enter service details (e.g., Vocal Recording, Mixing):", "Session");
+    if (!serviceDetailsInput || serviceDetailsInput.trim() === "") {
       toast({ title: "Booking Cancelled", description: "Service details are required.", variant: "destructive" });
-      setSelectedSlots([]); 
       return;
     }
+    const finalServiceDetails = serviceDetailsInput.trim();
 
-    const priceInput = window.prompt("Enter price for the total session(s):", "50");
-    let price = 0;
+    const priceInput = window.prompt(`Enter total price for the ${selectedSlots.length} selected session(s):`, "50");
+    let totalPriceForSession = 0;
     if (priceInput !== null) {
-        price = parseFloat(priceInput);
-        if (isNaN(price)) {
+        totalPriceForSession = parseFloat(priceInput);
+        if (isNaN(totalPriceForSession) || totalPriceForSession < 0) {
             toast({ title: "Invalid Price", description: "Price was not a valid number. Defaulting to 0.", variant: "destructive" });
-            price = 0;
+            totalPriceForSession = 0;
         }
     } else { 
         toast({ title: "Booking Cancelled", description: "Price input was cancelled.", variant: "destructive" });
-        setSelectedSlots([]); 
         return;
     }
+    // Distribute price evenly if multiple slots are part of the same booking transaction.
+    // Or, one could assign the full price to the first slot and 0 to subsequent if they are one contiguous block.
+    // For simplicity, we'll assign the price per slot for now.
+    const pricePerSlot = selectedSlots.length > 0 ? totalPriceForSession / selectedSlots.length : 0;
+
 
     const newlyConfirmedBookings: Booking[] = selectedSlots.map(slotTimeToBook => ({
       id: `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       startTime: slotTimeToBook,
       endTime: addHours(slotTimeToBook, 1), 
       clientName: finalClientName,
-      service: serviceDetails,
-      title: `${finalClientName} - ${serviceDetails}`,
-      price: price / selectedSlots.length, // Distribute price if multiple slots are booked as one transaction
+      service: finalServiceDetails,
+      title: `${finalClientName} - ${finalServiceDetails}`,
+      price: pricePerSlot, 
     }));
 
-    onNewBookingsAdd(newlyConfirmedBookings); // Notify parent
+    onNewBookingsAdd(newlyConfirmedBookings); 
     setSelectedSlots([]); 
     toast({
       title: 'Booking Confirmed!',

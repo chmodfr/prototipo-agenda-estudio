@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -21,11 +22,13 @@ import { Copy, Share2, Send, MessageSquare } from 'lucide-react';
 interface ShareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  studioName: string;
+  calendarLink: string;
 }
 
-export function ShareDialog({ open, onOpenChange }: ShareDialogProps) {
-  const [studioName, setStudioName] = useState('SessionSnap Studio');
-  const [calendarLink, setCalendarLink] = useState('https://example.com/sessionsnap/book');
+export function ShareDialog({ open, onOpenChange, studioName: initialStudioName, calendarLink: initialCalendarLink }: ShareDialogProps) {
+  const [studioName, setStudioName] = useState(initialStudioName);
+  const [calendarLink, setCalendarLink] = useState(initialCalendarLink);
   const [clientName, setClientName] = useState('');
   const [pastBookingData, setPastBookingData] = useState('');
   const [suggestedMessage, setSuggestedMessage] = useState('');
@@ -103,21 +106,21 @@ export function ShareDialog({ open, onOpenChange }: ShareDialogProps) {
         
         <div className="space-y-4 py-2">
           <div>
-            <Label htmlFor="studioName">Studio Name</Label>
-            <Input id="studioName" value={studioName} onChange={(e) => setStudioName(e.target.value)} className="bg-input"/>
+            <Label htmlFor="studioNameDialog">Studio Name</Label>
+            <Input id="studioNameDialog" value={studioName} onChange={(e) => setStudioName(e.target.value)} className="bg-input"/>
           </div>
           <div>
-            <Label htmlFor="calendarLink">Calendar Link</Label>
-            <Input id="calendarLink" value={calendarLink} onChange={(e) => setCalendarLink(e.target.value)} className="bg-input"/>
+            <Label htmlFor="calendarLinkDialog">Calendar Link</Label>
+            <Input id="calendarLinkDialog" value={calendarLink} onChange={(e) => setCalendarLink(e.target.value)} className="bg-input"/>
           </div>
           <div>
-            <Label htmlFor="clientName">Client Name (Optional)</Label>
-            <Input id="clientName" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="e.g., John Doe" className="bg-input"/>
+            <Label htmlFor="clientNameDialog">Client Name (Optional)</Label>
+            <Input id="clientNameDialog" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="e.g., John Doe" className="bg-input"/>
           </div>
           <div>
-            <Label htmlFor="pastBookingData">Past Booking Info (Optional for AI)</Label>
+            <Label htmlFor="pastBookingDataDialog">Past Booking Info (Optional for AI)</Label>
             <Textarea 
-              id="pastBookingData" 
+              id="pastBookingDataDialog" 
               value={pastBookingData} 
               onChange={(e) => setPastBookingData(e.target.value)} 
               placeholder="e.g., Booked vocal sessions twice last month" 
@@ -126,7 +129,7 @@ export function ShareDialog({ open, onOpenChange }: ShareDialogProps) {
           </div>
         </div>
 
-        <Button onClick={handleGenerateMessage} disabled={isLoading} className="w-full bg-primary hover:bg-primary/90">
+        <Button onClick={handleGenerateMessage} disabled={isLoading || !studioName || !calendarLink} className="w-full bg-primary hover:bg-primary/90">
           <MessageSquare className="mr-2 h-4 w-4" />
           {isLoading ? 'Generating...' : 'Generate Smart Message'}
         </Button>
@@ -160,3 +163,4 @@ export function ShareDialog({ open, onOpenChange }: ShareDialogProps) {
     </Dialog>
   );
 }
+
