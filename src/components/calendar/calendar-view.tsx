@@ -7,6 +7,15 @@ import { ChevronLeft, ChevronRight, BookMarked } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CalendarSlot } from './calendar-slot';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   getWeekDates,
   generateTimeSlots,
   checkSlotAvailability,
@@ -37,6 +46,13 @@ export function CalendarView({
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<Date[]>([]);
   const { toast } = useToast();
+
+  // State for the new booking details form
+  const [selectedClient, setSelectedClient] = useState<string>(''); // Stores client name or "NEW_CLIENT"
+  const [newClientName, setNewClientName] = useState<string>('');
+  const [serviceDetails, setServiceDetails] = useState<string>('Session');
+  const [bookingPrice, setBookingPrice] = useState<string>('50');
+
 
   useEffect(() => {
     setCurrentDateInternal(initialDate);
@@ -78,6 +94,11 @@ export function CalendarView({
     setCurrentDateInternal(newDate);
     onDateChange(newDate); 
     setSelectedSlots([]); 
+    // Reset booking form fields when week changes
+    setSelectedClient('');
+    setNewClientName('');
+    setServiceDetails('Session');
+    setBookingPrice('50');
   };
 
   const handlePrevWeek = () => {
@@ -100,6 +121,7 @@ export function CalendarView({
     const { isBooked, isBuffer } = checkSlotAvailability(slotTime, bookings);
     
     if (isBooked || isBuffer) {
+        // Prevent de-selection of already booked/buffer slots if they were somehow selected
         setSelectedSlots(prevSelected => prevSelected.filter(s => s.getTime() !== slotTime.getTime()));
         toast({
           title: 'Slot Unavailable',
@@ -122,11 +144,6 @@ export function CalendarView({
   };
 
   const handleConfirmBooking = () => {
-    if (typeof window === 'undefined') {
-      toast({ title: "Error", description: "Window object not available. Cannot create booking.", variant: "destructive" });
-      return;
-    }
-
     if (selectedSlots.length === 0) {
       toast({
         title: 'No Slots Selected',
@@ -136,59 +153,27 @@ export function CalendarView({
       return;
     }
     
-    // Client Name Prompt
-    let clientPromptText = "Client Name (Required):";
-    if (existingClientNames.length > 0) {
-      clientPromptText = `Client Name (Required - e.g., ${existingClientNames.join(", ")}) or type new:`;
-    }
-    const defaultClientName = existingClientNames.length > 0 ? (existingClientNames[0] || "") : "";
-    const clientNameInput = window.prompt(clientPromptText, defaultClientName);
-
-    if (clientNameInput === null) { // User clicked "Cancel"
-      toast({ 
-        title: "Booking Cancelled", 
-        description: "Client name entry was cancelled.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-    if (clientNameInput.trim() === "") { // User clicked "OK" but left it empty
-      toast({ 
-        title: "Client Name Missing", 
-        description: "Client name must be provided in the pop-up. Please try again.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-    const finalClientName = clientNameInput.trim();
-
-    // Service Details Prompt
-    const serviceDetailsInput = window.prompt("Enter service details (e.g., Vocal Recording, Mixing):", "Session");
-    if (serviceDetailsInput === null) { // User clicked "Cancel"
-        toast({ title: "Booking Cancelled", description: "Service details entry was cancelled.", variant: "destructive" });
+    let finalClientName = '';
+    if (selectedClient === 'NEW_CLIENT') {
+      finalClientName = newClientName.trim();
+      if (!finalClientName) {
+        toast({ title: "Client Name Missing", description: "Please enter a name for the new client.", variant: "destructive" });
         return;
-    }
-    let finalServiceDetails = "Session"; // Default if user clicks OK with empty input
-    if (serviceDetailsInput.trim() !== "") {
-      finalServiceDetails = serviceDetailsInput.trim();
-    }
-
-    // Price Prompt
-    const priceInput = window.prompt(`Enter total price for the ${selectedSlots.length} selected session(s) (e.g., 50):`, "50");
-    if (priceInput === null) { // User clicked "Cancel"
-        toast({ title: "Booking Cancelled", description: "Price input was cancelled.", variant: "destructive" });
-        return;
-    }
-    let totalPriceForSession = 0;
-    if (priceInput.trim() === "") { // User clicked OK but left it empty
-        toast({ title: "Invalid Price", description: "Price cannot be empty. Defaulting to $0 for this booking.", variant: "destructive" });
-        totalPriceForSession = 0; 
+      }
     } else {
-        totalPriceForSession = parseFloat(priceInput);
-        if (isNaN(totalPriceForSession) || totalPriceForSession < 0) {
-            toast({ title: "Invalid Price", description: "Price must be a valid non-negative number. Defaulting to $0 for this booking.", variant: "destructive" });
-            totalPriceForSession = 0; 
-        }
+      finalClientName = selectedClient;
+      if (!finalClientName) {
+        toast({ title: "Client Not Selected", description: "Please select a client or add a new one.", variant: "destructive" });
+        return;
+      }
+    }
+
+    const finalServiceDetails = serviceDetails.trim() || "Session";
+    
+    let totalPriceForSession = parseFloat(bookingPrice);
+    if (isNaN(totalPriceForSession) || totalPriceForSession < 0) {
+        toast({ title: "Invalid Price", description: "Price must be a valid non-negative number. Defaulting to $0.", variant: "destructive" });
+        totalPriceForSession = 0; 
     }
 
     const pricePerSlot = selectedSlots.length > 0 ? totalPriceForSession / selectedSlots.length : 0;
@@ -204,10 +189,17 @@ export function CalendarView({
     }));
 
     onNewBookingsAdd(newlyConfirmedBookings); 
+    
+    // Reset selections and form fields
     setSelectedSlots([]); 
+    setSelectedClient('');
+    setNewClientName('');
+    setServiceDetails('Session');
+    setBookingPrice('50');
+
     toast({
       title: 'Booking Confirmed!',
-      description: `${newlyConfirmedBookings.length} slot(s) booked for ${finalClientName}. Buffers will now reflect these bookings.`,
+      description: `${newlyConfirmedBookings.length} slot(s) booked for ${finalClientName}.`,
     });
   };
 
@@ -234,15 +226,8 @@ export function CalendarView({
           </h2>
           <Button variant="link" onClick={handleToday} className="text-sm text-accent p-0 h-auto">Go to Today</Button>
         </div>
-        <Button 
-          onClick={handleConfirmBooking} 
-          disabled={selectedSlots.length === 0}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[180px]"
-          aria-label="Confirm booking for selected slots"
-        >
-          <BookMarked className="mr-2 h-4 w-4" />
-          Book Selected ({selectedSlots.length})
-        </Button>
+         {/* Placeholder for the button that is now part of the booking details form */}
+        <div className="min-w-[180px]"></div>
       </div>
 
       <div className="overflow-x-auto">
@@ -279,6 +264,73 @@ export function CalendarView({
           </tbody>
         </table>
       </div>
+
+      {selectedSlots.length > 0 && (
+        <div className="mt-8 p-6 bg-secondary/30 rounded-lg shadow-md">
+          <h3 className="text-lg font-semibold mb-4 text-primary-foreground">Booking Details for {selectedSlots.length} Slot(s)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="client-select" className="text-foreground">Client</Label>
+              <Select value={selectedClient} onValueChange={setSelectedClient}>
+                <SelectTrigger id="client-select" className="bg-input text-foreground">
+                  <SelectValue placeholder="Select or Add Client" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover text-popover-foreground">
+                  {existingClientNames.map(name => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                  <SelectItem value="NEW_CLIENT">Add New Client...</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedClient === 'NEW_CLIENT' && (
+              <div>
+                <Label htmlFor="new-client-name" className="text-foreground">New Client Name</Label>
+                <Input 
+                  id="new-client-name" 
+                  value={newClientName} 
+                  onChange={(e) => setNewClientName(e.target.value)} 
+                  placeholder="Enter new client's name"
+                  className="bg-input text-foreground" 
+                />
+              </div>
+            )}
+            
+            <div>
+              <Label htmlFor="service-details" className="text-foreground">Service Details</Label>
+              <Input 
+                id="service-details" 
+                value={serviceDetails} 
+                onChange={(e) => setServiceDetails(e.target.value)} 
+                placeholder="e.g., Vocal Recording, Mixing"
+                className="bg-input text-foreground" 
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="booking-price" className="text-foreground">Total Price for Session(s)</Label>
+              <Input 
+                id="booking-price" 
+                type="number" 
+                value={bookingPrice} 
+                onChange={(e) => setBookingPrice(e.target.value)} 
+                placeholder="e.g., 150"
+                min="0"
+                className="bg-input text-foreground"
+              />
+            </div>
+          </div>
+          <Button 
+            onClick={handleConfirmBooking} 
+            className="mt-6 w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
+            aria-label="Confirm booking for selected slots"
+          >
+            <BookMarked className="mr-2 h-4 w-4" />
+            Confirm Booking ({selectedSlots.length})
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
