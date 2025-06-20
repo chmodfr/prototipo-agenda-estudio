@@ -1,3 +1,4 @@
+
 export interface Booking {
   id: string;
   startTime: Date;
@@ -5,6 +6,7 @@ export interface Booking {
   clientName?: string;
   service?: string;
   title?: string; // Generic title for the booking event
+  price?: number; // Added price field
 }
 
 export interface TimeSlot {

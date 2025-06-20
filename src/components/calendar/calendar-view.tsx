@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -23,7 +24,6 @@ export function CalendarView() {
   useEffect(() => {
     const newWeekDates = getWeekDates(currentDate);
     setWeekDates(newWeekDates);
-    // In a real app, you'd fetch bookings based on newWeekDates
     setBookings(getMockBookings(newWeekDates));
   }, [currentDate]);
 
@@ -57,6 +57,19 @@ export function CalendarView() {
   
   const handleToday = () => {
     setCurrentDate(new Date());
+  };
+
+  const handleBookSlot = (slotTimeToBook: Date) => {
+    const newBooking: Booking = {
+      id: `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`, // Added random string for better unique ID
+      startTime: slotTimeToBook,
+      endTime: addHours(slotTimeToBook, 1), // Assuming 1-hour slots for new bookings
+      clientName: 'Test Client',
+      service: 'Walk-in Session',
+      title: 'Walk-in Session (Test)',
+      price: 75, // Default price for new bookings
+    };
+    setBookings(prevBookings => [...prevBookings, newBooking]);
   };
 
   if (calendarData.length === 0) {
@@ -105,7 +118,10 @@ export function CalendarView() {
                 </td>
                 {calendarData.map(day => (
                   <td key={`${day.date.toISOString()}-${timeLabel}`} className="p-0 align-top h-16">
-                    <CalendarSlot slot={day.slots[rowIndex]} />
+                    <CalendarSlot 
+                      slot={day.slots[rowIndex]} 
+                      onSlotBook={handleBookSlot} 
+                    />
                   </td>
                 ))}
               </tr>

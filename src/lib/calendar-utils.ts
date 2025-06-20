@@ -1,3 +1,4 @@
+
 import {
   addDays,
   startOfWeek,
@@ -23,12 +24,6 @@ export const CALENDAR_END_HOUR = 19; // Display up to 18:00-19:00 slot
 
 export function getWeekDates(currentDate: Date = new Date()): Date[] {
   let monday = startOfWeek(currentDate, { weekStartsOn: 1 }); // 1 for Monday
-  // If current day is Sunday, startOfWeek gives previous Monday. We want current week's Monday.
-  // If current day is Saturday, startOfWeek gives current week's Monday, which is correct.
-  // if (isSunday(currentDate)) { // date-fns startOfWeek with weekStartsOn:1 already handles this well.
-  //   monday = addDays(monday, 7);
-  // }
-  
   const weekDates: Date[] = [];
   for (let i = 0; i < 6; i++) { // Monday to Saturday
     weekDates.push(addDays(monday, i));
@@ -87,7 +82,6 @@ export function getMockBookings(weekDates: Date[]): Booking[] {
   const bookings: Booking[] = [];
   if (weekDates.length === 0) return bookings;
 
-  // Ensure dates are for the current week to be visible
   const monday = weekDates[0];
   const tuesday = weekDates[1];
   const thursday = weekDates[3];
@@ -98,15 +92,17 @@ export function getMockBookings(weekDates: Date[]): Booking[] {
     endTime: setHours(setMinutes(monday,0), 11),   // Monday 11:00
     clientName: 'Alice Wonderland',
     service: 'Vocal Recording',
-    title: 'Alice - Vocals'
+    title: 'Alice - Vocals',
+    price: 100
   });
   bookings.push({
     id: '2',
     startTime: setHours(setMinutes(tuesday,0), 14), // Tuesday 14:00
-    endTime: setHours(setMinutes(tuesday,0), 16),   // Tuesday 16:00
+    endTime: setHours(setMinutes(tuesday,0), 16),   // Tuesday 16:00 (2 hour session)
     clientName: 'Bob The Builder',
     service: 'Mixing Session',
-    title: 'Bob - Mix'
+    title: 'Bob - Mix',
+    price: 150
   });
    bookings.push({
     id: '3',
@@ -114,15 +110,17 @@ export function getMockBookings(weekDates: Date[]): Booking[] {
     endTime: setHours(setMinutes(thursday,0), 18),   // Thursday 18:00
     clientName: 'Charlie Chaplin',
     service: 'Podcast Production',
-    title: 'Charlie - Podcast'
+    title: 'Charlie - Podcast',
+    price: 80
   });
    bookings.push({
     id: '4',
     startTime: setHours(setMinutes(thursday,0), 9), // Thursday 9:00
-    endTime: setHours(setMinutes(thursday,0), 11),   // Thursday 11:00
+    endTime: setHours(setMinutes(thursday,0), 11),   // Thursday 11:00 (2 hour session)
     clientName: 'Diana Prince',
     service: 'Mastering',
-    title: 'Diana - Master'
+    title: 'Diana - Master',
+    price: 200
   });
 
   return bookings;

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { CheckCircle, XCircle, MinusCircle } from 'lucide-react';
@@ -12,35 +13,48 @@ import {
 
 interface CalendarSlotProps {
   slot: TimeSlotType;
+  onSlotBook?: (slotTime: Date) => void; // Callback to handle booking
 }
 
-export function CalendarSlot({ slot }: CalendarSlotProps) {
+export function CalendarSlot({ slot, onSlotBook }: CalendarSlotProps) {
   const { isBooked, isBuffer, bookingDetails } = slot;
   const isAvailable = !isBooked && !isBuffer;
 
   let IconComponent;
   let iconColorClass = '';
   let slotBgClass = 'bg-card hover:bg-card/80';
-  let tooltipContent = 'Available';
+  let tooltipMessage = 'Available';
 
   if (isBooked) {
     IconComponent = XCircle;
     iconColorClass = 'text-destructive';
     slotBgClass = 'bg-destructive/20 hover:bg-destructive/30';
-    tooltipContent = `Booked: ${bookingDetails?.title || bookingDetails?.service || 'Event'}`;
+    tooltipMessage = `Booked: ${bookingDetails?.title || bookingDetails?.service || 'Event'}`;
     if (bookingDetails?.clientName) {
-      tooltipContent += ` by ${bookingDetails.clientName}`;
+      tooltipMessage += ` by ${bookingDetails.clientName}`;
+    }
+    if (bookingDetails?.price !== undefined) {
+      tooltipMessage += ` - Price: $${bookingDetails.price}`;
     }
   } else if (isBuffer) {
     IconComponent = MinusCircle;
-    iconColorClass = 'text-yellow-500'; // Using a direct color for buffer as it's not a standard theme color
+    iconColorClass = 'text-yellow-500'; 
     slotBgClass = 'bg-yellow-500/10 hover:bg-yellow-500/20';
-    tooltipContent = `Buffer time (related to: ${bookingDetails?.title || bookingDetails?.service || 'Event'})`;
+    tooltipMessage = `Buffer time (related to: ${bookingDetails?.title || bookingDetails?.service || 'Event'})`;
+     if (bookingDetails?.price !== undefined) {
+      tooltipMessage += ` - Price: $${bookingDetails.price}`;
+    }
   } else {
     IconComponent = CheckCircle;
-    iconColorClass = 'text-green-500'; // Using a direct color for available
-    tooltipContent = 'Available';
+    iconColorClass = 'text-green-500';
+    tooltipMessage = 'Available - Click to book';
   }
+
+  const handleClick = () => {
+    if (isAvailable && onSlotBook) {
+      onSlotBook(slot.time);
+    }
+  };
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -50,17 +64,18 @@ export function CalendarSlot({ slot }: CalendarSlotProps) {
             className={cn(
               'h-16 w-full flex items-center justify-center p-2 border-r border-b border-border/50 transition-colors',
               slotBgClass,
-              isAvailable ? 'cursor-pointer' : 'cursor-not-allowed'
+              isAvailable && onSlotBook ? 'cursor-pointer' : 'cursor-not-allowed'
             )}
-            aria-label={`${slot.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${tooltipContent}`}
-            role="button" // Semantically a cell, but could be interactive
-            tabIndex={0} // Make it focusable
+            aria-label={`${slot.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${tooltipMessage}`}
+            role="button"
+            tabIndex={0}
+            onClick={handleClick}
           >
             <IconComponent className={cn('h-6 w-6', iconColorClass)} />
           </div>
         </TooltipTrigger>
         <TooltipContent className="bg-popover text-popover-foreground p-2 rounded-md shadow-lg">
-          <p className="text-sm">{tooltipContent}</p>
+          <p className="text-sm">{tooltipMessage}</p>
           <p className="text-xs text-muted-foreground">{slot.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(slot.time.getTime() + 60 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
         </TooltipContent>
       </Tooltip>
