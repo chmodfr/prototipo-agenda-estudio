@@ -1,7 +1,7 @@
 
-// Defines the TypeScript interfaces for the Firestore data model.
-// For actual Firestore interactions, Date fields would typically be
-// Firestore Timestamps. These definitions use Date for simplicity in sample data.
+// Define as interfaces TypeScript para o modelo de dados do Firestore.
+// Para interações reais com o Firestore, os campos de Data seriam tipicamente
+// Timestamps do Firestore. Estas definições usam Date para simplicidade nos dados de amostra.
 
 export interface ClientDocument {
   id: string;
@@ -14,19 +14,19 @@ export type PacoteType = "Avulso" | "Pacote 10h" | "Pacote 20h" | "Pacote 40h";
 
 export interface ProjectDocument {
   id: string;
-  clientId: string; // Reference to /clients collection document ID
+  clientId: string; // Referência ao ID do documento da coleção /clients
   name: string;
   billingType: BillingType;
-  pacoteSelecionado?: PacoteType; // Should be present if billingType is "pacote"
-  customRate?: number; // Should be present if billingType is "personalizado"
-  createdAt: Date; // In Firestore, this will be a server Timestamp
+  pacoteSelecionado?: PacoteType; // Deve estar presente se o billingType for "pacote"
+  customRate?: number; // Deve estar presente se o billingType for "personalizado"
+  createdAt: Date; // No Firestore, isso será um Timestamp do servidor
 }
 
 export interface BookingDocument {
   id: string;
-  clientId: string; // Reference to /clients collection document ID
-  projectId: string; // Reference to /projects collection document ID
-  startTime: Date; // In Firestore, this will be a Timestamp
-  endTime: Date;   // In Firestore, this will be a Timestamp
-  duration: number; // Duration in hours, calculated from startTime and endTime
+  clientId: string; // Referência ao ID do documento da coleção /clients
+  projectId: string; // Referência ao ID do documento da coleção /projects
+  startTime: Date; // No Firestore, isso será um Timestamp
+  endTime: Date;   // No Firestore, isso será um Timestamp
+  duration: number; // Duração em horas, calculada a partir de startTime e endTime
 }

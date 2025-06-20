@@ -14,11 +14,11 @@ export function AppHeader() {
         </Link>
         <nav className="flex items-center gap-6">
           <Link href="/" className="text-foreground hover:text-primary transition-colors text-sm font-medium">
-            Calendar
+            Calendário
           </Link>
           <Link href="/manage-projects" className="text-foreground hover:text-primary transition-colors text-sm font-medium flex items-center gap-1.5">
             <FolderGit2 className="h-5 w-5" />
-            Manage Clients & Projects
+            Gerenciar Clientes e Projetos
           </Link>
         </nav>
       </div>

@@ -114,10 +114,10 @@ export function getBookingsForWeek(
     .map(doc => {
       const client = allClients.find(c => c.id === doc.clientId);
       const project = allProjects.find(p => p.id === doc.projectId);
-      const clientName = client ? client.name : 'Unknown Client';
-      const projectName = project ? project.name : "Unknown Project";
+      const clientName = client ? client.name : 'Cliente Desconhecido';
+      const projectName = project ? project.name : "Projeto Desconhecido";
       // Assuming a default service or deriving from project if needed
-      const service = `Session for ${projectName}`; 
+      const service = `Sessão para ${projectName}`; 
       const bookingPrice = project ? calculateProjectCost([doc], [project])?.totalAmount : 0;
 
 
@@ -167,7 +167,7 @@ export function calculateMonthlyClientMetrics(
   uiBookings.forEach(booking => {
     if (isSameMonth(new Date(booking.startTime), targetDateForMonth) && booking.clientId) {
       const client = allClients.find(c => c.id === booking.clientId);
-      const clientNameForRecipe = client ? client.name : `Client ID: ${booking.clientId}`;
+      const clientNameForRecipe = client ? client.name : `Cliente ID: ${booking.clientId}`;
 
       if (!clientBookingsData[clientNameForRecipe]) {
         clientBookingsData[clientNameForRecipe] = {
@@ -227,14 +227,14 @@ export function calculateProjectCost(
 
   if (project.billingType === 'personalizado') {
     if (typeof project.customRate !== 'number') {
-      console.warn(`Project ${project.id} has billingType "personalizado" but customRate is missing or invalid. Defaulting to 0.`);
+      console.warn(`O projeto ${project.id} tem tipo de cobrança "personalizado", mas o valor customRate está ausente ou é inválido. Usando 0 como padrão.`);
       pricePerHour = 0; // Default or handle as error
     } else {
       pricePerHour = project.customRate;
     }
   } else if (project.billingType === 'pacote') {
     if (!project.pacoteSelecionado) {
-      console.warn(`Project ${project.id} has billingType "pacote" but pacoteSelecionado is missing. Defaulting to Avulso rate.`);
+      console.warn(`O projeto ${project.id} tem tipo de cobrança "pacote", mas o pacoteSelecionado está ausente. Usando o valor de Avulso como padrão.`);
       pricePerHour = 350; // Default to Avulso or handle as error
     } else {
       switch (project.pacoteSelecionado) {
@@ -251,13 +251,13 @@ export function calculateProjectCost(
           pricePerHour = 160;
           break;
         default:
-          console.warn(`Project ${project.id} has unknown pacoteSelecionado: ${project.pacoteSelecionado}. Defaulting to Avulso rate.`);
+          console.warn(`O projeto ${project.id} tem um pacoteSelecionado desconhecido: ${project.pacoteSelecionado}. Usando o valor de Avulso como padrão.`);
           pricePerHour = 350; // Default or handle as error
           break;
       }
     }
   } else {
-    console.error(`Project ${project.id} has an unknown billingType: ${project.billingType}`);
+    console.error(`O projeto ${project.id} tem um tipo de cobrança desconhecido: ${project.billingType}`);
     return null;
   }
 

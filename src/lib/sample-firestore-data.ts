@@ -1,13 +1,13 @@
 
 import type { ClientDocument, ProjectDocument, BookingDocument, PacoteType, BillingType } from '@/types/firestore';
 
-// Helper function to calculate duration in hours
+// Função auxiliar para calcular a duração em horas
 const calculateDuration = (start: Date, end: Date): number => {
   const diffMilliseconds = end.getTime() - start.getTime();
   return parseFloat((diffMilliseconds / (1000 * 60 * 60)).toFixed(2));
 };
 
-// Sample Clients
+// Clientes de Amostra
 export const sampleClients: ClientDocument[] = [
   { id: 'client_001', name: 'Estúdio Som & Arte', phone: '+55 11 98888-1111' },
   { id: 'client_002', name: 'Rádio Onda Sonora', phone: '+55 21 97777-2222' },
@@ -15,14 +15,14 @@ export const sampleClients: ClientDocument[] = [
   { id: 'client_internal_000', name: 'Studio Internal', phone: '+55 00 00000-0000'}
 ];
 
-// Sample Projects
+// Projetos de Amostra
 export const sampleProjects: ProjectDocument[] = [
   {
     id: 'project_general_calendar',
-    clientId: 'client_internal_000', // Linked to Studio Internal client
+    clientId: 'client_internal_000', // Vinculado ao cliente Interno do Estúdio
     name: 'General Calendar Bookings',
-    billingType: 'personalizado', // Or a default package, depends on desired handling
-    customRate: 0, // This project might not have direct billing, or use a default
+    billingType: 'personalizado', // Ou um pacote padrão, depende do tratamento desejado
+    customRate: 0, // Este projeto pode não ter cobrança direta, ou usar um padrão
     createdAt: new Date('2023-01-01T00:00:00Z'),
   },
   {
@@ -67,15 +67,15 @@ export const sampleProjects: ProjectDocument[] = [
   },
 ];
 
-// Sample Bookings
-// Ensure all bookings have a valid clientId and projectId
+// Agendamentos de Amostra
+// Garanta que todos os agendamentos tenham um clientId e projectId válidos
 export const sampleBookings: BookingDocument[] = [
   {
     id: 'booking_sg001',
     clientId: 'client_001',
     projectId: 'project_alpha_001',
     startTime: new Date('2023-09-12T10:00:00Z'),
-    endTime: new Date('2023-09-12T15:00:00Z'), // 5 hours
+    endTime: new Date('2023-09-12T15:00:00Z'), // 5 horas
     duration: calculateDuration(new Date('2023-09-12T10:00:00Z'), new Date('2023-09-12T15:00:00Z')),
   },
   {
@@ -83,7 +83,7 @@ export const sampleBookings: BookingDocument[] = [
     clientId: 'client_001',
     projectId: 'project_alpha_001',
     startTime: new Date('2023-09-13T10:00:00Z'),
-    endTime: new Date('2023-09-13T18:00:00Z'), // 8 hours
+    endTime: new Date('2023-09-13T18:00:00Z'), // 8 horas
     duration: calculateDuration(new Date('2023-09-13T10:00:00Z'), new Date('2023-09-13T18:00:00Z')),
   },
   {
@@ -91,7 +91,7 @@ export const sampleBookings: BookingDocument[] = [
     clientId: 'client_002',
     projectId: 'project_beta_002',
     startTime: new Date('2023-10-02T09:00:00Z'),
-    endTime: new Date('2023-10-02T12:00:00Z'), // 3 hours
+    endTime: new Date('2023-10-02T12:00:00Z'), // 3 horas
     duration: calculateDuration(new Date('2023-10-02T09:00:00Z'), new Date('2023-10-02T12:00:00Z')),
   },
   {
@@ -99,7 +99,7 @@ export const sampleBookings: BookingDocument[] = [
     clientId: 'client_002',
     projectId: 'project_beta_002',
     startTime: new Date('2023-10-03T14:00:00Z'),
-    endTime: new Date('2023-10-03T17:00:00Z'), // 3 hours
+    endTime: new Date('2023-10-03T17:00:00Z'), // 3 horas
     duration: calculateDuration(new Date('2023-10-03T14:00:00Z'), new Date('2023-10-03T17:00:00Z')),
   },
   {
@@ -107,7 +107,7 @@ export const sampleBookings: BookingDocument[] = [
     clientId: 'client_001',
     projectId: 'project_gamma_003',
     startTime: new Date('2023-11-10T13:00:00Z'),
-    endTime: new Date('2023-11-10T18:00:00Z'), // 5 hours
+    endTime: new Date('2023-11-10T18:00:00Z'), // 5 horas
     duration: calculateDuration(new Date('2023-11-10T13:00:00Z'), new Date('2023-11-10T18:00:00Z')),
   },
   {
@@ -115,7 +115,7 @@ export const sampleBookings: BookingDocument[] = [
     clientId: 'client_003',
     projectId: 'project_delta_004',
     startTime: new Date('2024-01-20T10:00:00Z'),
-    endTime: new Date('2024-01-20T14:00:00Z'), // 4 hours
+    endTime: new Date('2024-01-20T14:00:00Z'), // 4 horas
     duration: calculateDuration(new Date('2024-01-20T10:00:00Z'), new Date('2024-01-20T14:00:00Z')),
   },
   {
@@ -123,24 +123,24 @@ export const sampleBookings: BookingDocument[] = [
     clientId: 'client_002',
     projectId: 'project_epsilon_005',
     startTime: new Date('2024-02-05T09:00:00Z'),
-    endTime: new Date('2024-02-05T11:00:00Z'), // 2 hours
+    endTime: new Date('2024-02-05T11:00:00Z'), // 2 horas
     duration: calculateDuration(new Date('2024-02-05T09:00:00Z'), new Date('2024-02-05T11:00:00Z')),
   },
-  // Add some bookings for project_general_calendar for testing calendar page initial load
+  // Adicione alguns agendamentos para project_general_calendar para testar o carregamento inicial da página do calendário
   {
     id: 'booking_cal001',
-    clientId: 'client_001', // Example: Alice books a general slot
+    clientId: 'client_001', // Exemplo: Alice agenda um horário geral
     projectId: 'project_general_calendar',
-    startTime: new Date(new Date().setDate(new Date().getDate() + 1)), // Tomorrow 10 AM
-    endTime: new Date(new Date(new Date().setDate(new Date().getDate() + 1)).setHours(11,0,0,0)), // Tomorrow 11 AM
+    startTime: new Date(new Date().setDate(new Date().getDate() + 1)), // Amanhã 10h
+    endTime: new Date(new Date(new Date().setDate(new Date().getDate() + 1)).setHours(11,0,0,0)), // Amanhã 11h
     duration: 1,
   },
    {
     id: 'booking_cal002',
-    clientId: 'client_002', // Example: Bob books a general slot
+    clientId: 'client_002', // Exemplo: Bob agenda um horário geral
     projectId: 'project_general_calendar',
-    startTime: new Date(new Date().setDate(new Date().getDate() + 2)), // Day after tomorrow 2 PM
-    endTime: new Date(new Date(new Date().setDate(new Date().getDate() + 2)).setHours(16,0,0,0)), // Day after tomorrow 4 PM
+    startTime: new Date(new Date().setDate(new Date().getDate() + 2)), // Depois de amanhã 14h
+    endTime: new Date(new Date(new Date().setDate(new Date().getDate() + 2)).setHours(16,0,0,0)), // Depois de amanhã 16h
     duration: 2,
   },
 ];

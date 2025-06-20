@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: 'SessionSnap',
-  description: 'Weekly Availability Calendar for Recording Studios',
+  description: 'Calendário de Disponibilidade Semanal para Estúdios de Gravação',
 };
 
 export default function RootLayout({
@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} dark`}>
+    <html lang="pt-BR" className={`${inter.variable} dark`}>
       <head />
       <body className="font-body antialiased">
         {children}

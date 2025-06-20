@@ -38,8 +38,8 @@ export function ShareDialog({ open, onOpenChange, studioName: initialStudioName,
   const handleGenerateMessage = async () => {
     if (!studioName || !calendarLink) {
       toast({
-        title: 'Missing Information',
-        description: 'Studio Name and Calendar Link are required.',
+        title: 'Informação Faltando',
+        description: 'Nome do Estúdio e Link do Calendário são obrigatórios.',
         variant: 'destructive',
       });
       return;
@@ -57,8 +57,8 @@ export function ShareDialog({ open, onOpenChange, studioName: initialStudioName,
     } catch (error) {
       console.error('Error generating message:', error);
       toast({
-        title: 'Error',
-        description: 'Could not generate message. Please try again.',
+        title: 'Erro',
+        description: 'Não foi possível gerar a mensagem. Por favor, tente novamente.',
         variant: 'destructive',
       });
     } finally {
@@ -69,7 +69,7 @@ export function ShareDialog({ open, onOpenChange, studioName: initialStudioName,
   const handleCopyToClipboard = () => {
     if (suggestedMessage) {
       navigator.clipboard.writeText(suggestedMessage);
-      toast({ title: 'Copied!', description: 'Message copied to clipboard.' });
+      toast({ title: 'Copiado!', description: 'Mensagem copiada para a área de transferência.' });
     }
   };
 
@@ -78,16 +78,16 @@ export function ShareDialog({ open, onOpenChange, studioName: initialStudioName,
       const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(suggestedMessage)}`;
       window.open(whatsappUrl, '_blank');
     } else {
-       toast({ title: 'No message', description: 'Generate a message first.', variant: 'destructive' });
+       toast({ title: 'Nenhuma mensagem', description: 'Gere uma mensagem primeiro.', variant: 'destructive' });
     }
   };
 
   const handleShareViaEmail = () => {
      if (suggestedMessage) {
-      const emailUrl = `mailto:?subject=Studio Availability - ${studioName}&body=${encodeURIComponent(suggestedMessage)}`;
+      const emailUrl = `mailto:?subject=Disponibilidade do Estúdio - ${studioName}&body=${encodeURIComponent(suggestedMessage)}`;
       window.open(emailUrl, '_blank');
     } else {
-       toast({ title: 'No message', description: 'Generate a message first.', variant: 'destructive' });
+       toast({ title: 'Nenhuma mensagem', description: 'Gere uma mensagem primeiro.', variant: 'destructive' });
     }
   };
 
@@ -97,33 +97,33 @@ export function ShareDialog({ open, onOpenChange, studioName: initialStudioName,
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-headline">
             <Share2 className="h-6 w-6 text-primary" />
-            Share Availability
+            Compartilhar Disponibilidade
           </DialogTitle>
           <DialogDescription>
-            Generate a personalized message to share your studio's availability.
+            Gere uma mensagem personalizada para compartilhar a disponibilidade do seu estúdio.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-2">
           <div>
-            <Label htmlFor="studioNameDialog">Studio Name</Label>
+            <Label htmlFor="studioNameDialog">Nome do Estúdio</Label>
             <Input id="studioNameDialog" value={studioName} onChange={(e) => setStudioName(e.target.value)} className="bg-input"/>
           </div>
           <div>
-            <Label htmlFor="calendarLinkDialog">Calendar Link</Label>
+            <Label htmlFor="calendarLinkDialog">Link do Calendário</Label>
             <Input id="calendarLinkDialog" value={calendarLink} onChange={(e) => setCalendarLink(e.target.value)} className="bg-input"/>
           </div>
           <div>
-            <Label htmlFor="clientNameDialog">Client Name (Optional)</Label>
-            <Input id="clientNameDialog" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="e.g., John Doe" className="bg-input"/>
+            <Label htmlFor="clientNameDialog">Nome do Cliente (Opcional)</Label>
+            <Input id="clientNameDialog" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="ex: João Silva" className="bg-input"/>
           </div>
           <div>
-            <Label htmlFor="pastBookingDataDialog">Past Booking Info (Optional for AI)</Label>
+            <Label htmlFor="pastBookingDataDialog">Informações de Agendamentos Anteriores (Opcional para IA)</Label>
             <Textarea 
               id="pastBookingDataDialog" 
               value={pastBookingData} 
               onChange={(e) => setPastBookingData(e.target.value)} 
-              placeholder="e.g., Booked vocal sessions twice last month" 
+              placeholder="ex: Agendou sessões de voz duas vezes no mês passado" 
               className="bg-input"
             />
           </div>
@@ -131,16 +131,16 @@ export function ShareDialog({ open, onOpenChange, studioName: initialStudioName,
 
         <Button onClick={handleGenerateMessage} disabled={isLoading || !studioName || !calendarLink} className="w-full bg-primary hover:bg-primary/90">
           <MessageSquare className="mr-2 h-4 w-4" />
-          {isLoading ? 'Generating...' : 'Generate Smart Message'}
+          {isLoading ? 'Gerando...' : 'Gerar Mensagem Inteligente'}
         </Button>
 
         {suggestedMessage && (
           <div className="mt-4 p-3 bg-muted rounded-md space-y-2">
-            <Label>Suggested Message:</Label>
+            <Label>Mensagem Sugerida:</Label>
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{suggestedMessage}</p>
             <div className="flex gap-2 pt-2">
               <Button variant="outline" size="sm" onClick={handleCopyToClipboard}>
-                <Copy className="mr-2 h-4 w-4" /> Copy
+                <Copy className="mr-2 h-4 w-4" /> Copiar
               </Button>
               <Button variant="outline" size="sm" onClick={handleShareViaWhatsApp} className="bg-green-500 hover:bg-green-600 text-white">
                 <Send className="mr-2 h-4 w-4" /> WhatsApp
@@ -155,7 +155,7 @@ export function ShareDialog({ open, onOpenChange, studioName: initialStudioName,
         <DialogFooter className="sm:justify-start mt-4">
           <DialogClose asChild>
             <Button type="button" variant="secondary">
-              Close
+              Fechar
             </Button>
           </DialogClose>
         </DialogFooter>
@@ -163,4 +163,3 @@ export function ShareDialog({ open, onOpenChange, studioName: initialStudioName,
     </Dialog>
   );
 }
-

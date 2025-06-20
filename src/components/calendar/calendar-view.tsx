@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { format, addHours } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, BookMarked } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CalendarSlot } from './calendar-slot';
@@ -56,7 +57,7 @@ export function CalendarView({
   const [newClientNameInput, setNewClientNameInput] = useState<string>('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [newProjectNameInput, setNewProjectNameInput] = useState<string>('');
-  const [serviceDetails, setServiceDetails] = useState<string>('Session');
+  const [serviceDetails, setServiceDetails] = useState<string>('Sessão');
   
   const HOURLY_RATE = 50; // Placeholder hourly rate
 
@@ -117,7 +118,7 @@ export function CalendarView({
     setNewClientNameInput('');
     setSelectedProjectId('');
     setNewProjectNameInput('');
-    setServiceDetails('Session');
+    setServiceDetails('Sessão');
   };
 
   const handlePrevWeek = () => {
@@ -142,8 +143,8 @@ export function CalendarView({
     if (isBooked || isBuffer) {
         setSelectedSlots(prevSelected => prevSelected.filter(s => s.getTime() !== slotTime.getTime()));
         toast({
-          title: 'Slot Unavailable',
-          description: 'This time slot is already booked or is a buffer time.',
+          title: 'Horário Indisponível',
+          description: 'Este horário já está agendado ou é um tempo de segurança.',
           variant: 'destructive',
         });
         return;
@@ -164,8 +165,8 @@ export function CalendarView({
   const handleConfirmBooking = () => {
     if (selectedSlots.length === 0) {
       toast({
-        title: 'No Slots Selected',
-        description: 'Please select one or more available slots to book.',
+        title: 'Nenhum Horário Selecionado',
+        description: 'Por favor, selecione um ou mais horários disponíveis para agendar.',
         variant: 'destructive',
       });
       return;
@@ -177,7 +178,7 @@ export function CalendarView({
     if (selectedClientId === 'NEW_CLIENT') {
       finalClientNameToDisplay = newClientNameInput.trim();
       if (!finalClientNameToDisplay) {
-        toast({ title: "Client Name Missing", description: "Please enter a name for the new client.", variant: "destructive" });
+        toast({ title: "Nome do Cliente Faltando", description: "Por favor, digite um nome para o novo cliente.", variant: "destructive" });
         return;
       }
       finalClientId = `new-client-${Date.now()}`; 
@@ -185,7 +186,7 @@ export function CalendarView({
     } else {
       const client = allClients.find(c => c.id === selectedClientId);
       if (!client) {
-         toast({ title: "Client Not Selected", description: "Please select an existing client.", variant: "destructive" });
+         toast({ title: "Cliente Não Selecionado", description: "Por favor, selecione um cliente existente.", variant: "destructive" });
         return;
       }
       finalClientId = client.id;
@@ -198,11 +199,11 @@ export function CalendarView({
     if (selectedProjectId === 'NEW_PROJECT') {
       finalProjectNameToDisplay = newProjectNameInput.trim();
       if (!finalProjectNameToDisplay) {
-        toast({ title: "Project Name Missing", description: "Please enter a name for the new project.", variant: "destructive" });
+        toast({ title: "Nome do Projeto Faltando", description: "Por favor, digite um nome para o novo projeto.", variant: "destructive" });
         return;
       }
       if (!finalClientId || finalClientId === 'NEW_CLIENT' && !newClientNameInput.trim()){
-         toast({ title: "Client Required for New Project", description: "A client must be selected or created before adding a new project.", variant: "destructive" });
+         toast({ title: "Cliente Necessário para Novo Projeto", description: "Um cliente deve ser selecionado ou criado antes de adicionar um novo projeto.", variant: "destructive" });
         return;
       }
       finalProjectId = `new-project-${Date.now()}`;
@@ -210,7 +211,7 @@ export function CalendarView({
     } else {
       const project = allProjects.find(p => p.id === selectedProjectId);
       if (!project) {
-        toast({ title: "Project Not Selected", description: "Please select or create a project for this booking.", variant: "destructive" });
+        toast({ title: "Projeto Não Selecionado", description: "Por favor, selecione ou crie um projeto para este agendamento.", variant: "destructive" });
         return;
       }
       finalProjectId = project.id;
@@ -218,7 +219,7 @@ export function CalendarView({
     }
 
 
-    const finalServiceDetails = serviceDetails.trim() || "Session";
+    const finalServiceDetails = serviceDetails.trim() || "Sessão";
         
     const newlyConfirmedBookings: Booking[] = selectedSlots.map(slotTimeToBook => ({
       id: `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`,
@@ -240,36 +241,36 @@ export function CalendarView({
     setNewClientNameInput('');
     setSelectedProjectId('');
     setNewProjectNameInput('');
-    setServiceDetails('Session');
+    setServiceDetails('Sessão');
 
     toast({
-      title: 'Booking Confirmed!',
-      description: `${newlyConfirmedBookings.length} slot(s) booked for ${finalClientNameToDisplay} on project ${finalProjectNameToDisplay}.`,
+      title: 'Agendamento Confirmado!',
+      description: `${newlyConfirmedBookings.length} horário(s) agendado(s) para ${finalClientNameToDisplay} no projeto ${finalProjectNameToDisplay}.`,
     });
   };
 
   if (calendarData.length === 0) {
-    return <div className="p-4 text-center text-muted-foreground">Loading calendar...</div>;
+    return <div className="p-4 text-center text-muted-foreground">Carregando calendário...</div>;
   }
 
   return (
     <div id={calendarId} className="p-4 md:p-6 bg-card rounded-lg shadow-xl">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handlePrevWeek} aria-label="Previous week">
+          <Button variant="outline" onClick={handlePrevWeek} aria-label="Semana anterior">
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <Button variant="outline" onClick={handleNextWeek} aria-label="Next week">
+          <Button variant="outline" onClick={handleNextWeek} aria-label="Próxima semana">
             <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
         <div className="text-center">
           <h2 className="text-xl md:text-2xl font-semibold text-primary-foreground">
             {weekDates.length > 0 ?
-             `${format(weekDates[0], 'MMM d')} - ${format(weekDates[weekDates.length - 1], 'MMM d, yyyy')}` :
-             'Loading...'}
+             `${format(weekDates[0], 'd MMM', { locale: ptBR })} - ${format(weekDates[weekDates.length - 1], 'd MMM, yyyy', { locale: ptBR })}` :
+             'Carregando...'}
           </h2>
-          <Button variant="link" onClick={handleToday} className="text-sm text-accent p-0 h-auto">Go to Today</Button>
+          <Button variant="link" onClick={handleToday} className="text-sm text-accent p-0 h-auto">Ir para Hoje</Button>
         </div>
         <div className="min-w-[180px]"></div> {/* Spacer */}
       </div>
@@ -279,11 +280,11 @@ export function CalendarView({
           <thead className="bg-secondary/50">
             <tr>
               <th scope="col" className="sticky left-0 z-10 bg-secondary/50 p-3 text-xs md:text-sm font-medium text-secondary-foreground border-b border-r border-border/50 w-24">
-                Time
+                Hora
               </th>
               {weekDates.map(date => (
                 <th scope="col" key={date.toISOString()} className="p-3 text-xs md:text-sm font-medium text-secondary-foreground border-b border-r border-border/50 min-w-[100px] md:min-w-[120px]">
-                  <div>{format(date, 'EEE')}</div>
+                  <div>{format(date, 'EEE', { locale: ptBR })}</div>
                   <div className="text-xs text-muted-foreground">{format(date, 'dd/MM')}</div>
                 </th>
               ))}
@@ -311,55 +312,55 @@ export function CalendarView({
 
       {selectedSlots.length > 0 && (
         <div className="mt-8 p-6 bg-secondary/30 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold mb-4 text-primary-foreground">Booking Details for {selectedSlots.length} Slot(s)</h3>
+          <h3 className="text-lg font-semibold mb-4 text-primary-foreground">Detalhes do Agendamento para {selectedSlots.length} Horário(s)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <Label htmlFor="client-select" className="text-foreground">Client</Label>
+              <Label htmlFor="client-select" className="text-foreground">Cliente</Label>
               <Select value={selectedClientId} onValueChange={setSelectedClientId}>
                 <SelectTrigger id="client-select" className="bg-input text-foreground">
-                  <SelectValue placeholder="Select or Add Client" />
+                  <SelectValue placeholder="Selecione ou Adicione um Cliente" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover text-popover-foreground">
                   {existingClientOptions.map(option => (
                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                   ))}
-                  <SelectItem value="NEW_CLIENT">Add New Client...</SelectItem>
+                  <SelectItem value="NEW_CLIENT">Adicionar Novo Cliente...</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {selectedClientId === 'NEW_CLIENT' && (
               <div>
-                <Label htmlFor="new-client-name" className="text-foreground">New Client Name</Label>
+                <Label htmlFor="new-client-name" className="text-foreground">Nome do Novo Cliente</Label>
                 <Input 
                   id="new-client-name" 
                   value={newClientNameInput} 
                   onChange={(e) => setNewClientNameInput(e.target.value)} 
-                  placeholder="Enter new client's name"
+                  placeholder="Digite o nome do novo cliente"
                   className="bg-input text-foreground" 
                 />
               </div>
             )}
             
             <div>
-              <Label htmlFor="project-select" className="text-foreground">Project</Label>
+              <Label htmlFor="project-select" className="text-foreground">Projeto</Label>
               <Select 
                 value={selectedProjectId} 
                 onValueChange={setSelectedProjectId}
                 disabled={!selectedClientId || (selectedClientId === 'NEW_CLIENT' && !newClientNameInput.trim())}
               >
                 <SelectTrigger id="project-select" className="bg-input text-foreground">
-                  <SelectValue placeholder="Select or Add Project" />
+                  <SelectValue placeholder="Selecione ou Adicione um Projeto" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover text-popover-foreground">
                   {availableProjectOptions.map(option => (
                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                   ))}
                   {selectedClientId && selectedClientId !== 'NEW_CLIENT' && (
-                     <SelectItem value="NEW_PROJECT">Add New Project for {allClients.find(c=>c.id === selectedClientId)?.name || 'Selected Client'}...</SelectItem>
+                     <SelectItem value="NEW_PROJECT">Adicionar Novo Projeto para {allClients.find(c=>c.id === selectedClientId)?.name || 'Cliente Selecionado'}...</SelectItem>
                   )}
                    {selectedClientId === 'NEW_CLIENT' && newClientNameInput.trim() && (
-                     <SelectItem value="NEW_PROJECT">Add New Project for {newClientNameInput.trim()}...</SelectItem>
+                     <SelectItem value="NEW_PROJECT">Adicionar Novo Projeto para {newClientNameInput.trim()}...</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -367,24 +368,24 @@ export function CalendarView({
 
             {selectedProjectId === 'NEW_PROJECT' && (
               <div>
-                <Label htmlFor="new-project-name" className="text-foreground">New Project Name</Label>
+                <Label htmlFor="new-project-name" className="text-foreground">Nome do Novo Projeto</Label>
                 <Input 
                   id="new-project-name" 
                   value={newProjectNameInput} 
                   onChange={(e) => setNewProjectNameInput(e.target.value)} 
-                  placeholder="Enter new project's name"
+                  placeholder="Digite o nome do novo projeto"
                   className="bg-input text-foreground" 
                 />
               </div>
             )}
 
             <div>
-              <Label htmlFor="service-details" className="text-foreground">Service Details</Label>
+              <Label htmlFor="service-details" className="text-foreground">Detalhes do Serviço</Label>
               <Input 
                 id="service-details" 
                 value={serviceDetails} 
                 onChange={(e) => setServiceDetails(e.target.value)} 
-                placeholder="e.g., Vocal Recording, Mixing"
+                placeholder="ex: Gravação de Voz, Mixagem"
                 className="bg-input text-foreground" 
               />
             </div>
@@ -393,14 +394,13 @@ export function CalendarView({
           <Button 
             onClick={handleConfirmBooking} 
             className="mt-6 w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
-            aria-label="Confirm booking for selected slots"
+            aria-label="Confirmar agendamento para os horários selecionados"
           >
             <BookMarked className="mr-2 h-4 w-4" />
-            Confirm Booking ({selectedSlots.length})
+            Confirmar Agendamento ({selectedSlots.length})
           </Button>
         </div>
       )}
     </div>
   );
 }
-

@@ -7,10 +7,10 @@ export interface Booking {
   clientId: string; 
   clientName: string; 
   projectId: string; 
-  projectName?: string; // Optional: for easier display if needed
+  projectName?: string; // Opcional: para facilitar a exibição, se necessário
   service?: string;
   title?: string; 
-  price?: number; // Price for this specific booking slot/duration
+  price?: number; // Preço para este horário/duração de agendamento específico
 }
 
 export interface TimeSlot {
@@ -27,11 +27,11 @@ export interface DayWithSlots {
 
 export interface ClientMonthlyMetrics {
   totalHours: number;
-  pricePerHour: number; // This will now be an effective/average rate if project rates varied
+  pricePerHour: number; // Esta será agora uma taxa efetiva/média se os valores do projeto variarem
   totalAmount: number;  
 }
 
-export type MonthlyRecipe = Record<string, ClientMonthlyMetrics>; // Key is clientName for display
+export type MonthlyRecipe = Record<string, ClientMonthlyMetrics>; // A chave é o nome do cliente para exibição
 
 export interface ProjectCostMetrics {
   totalHours: number;

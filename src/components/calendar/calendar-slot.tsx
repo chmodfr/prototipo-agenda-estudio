@@ -29,31 +29,31 @@ export function CalendarSlot({ slot, onSlotClick }: CalendarSlotProps) {
     IconComponent = CheckSquare;
     iconColorClass = 'text-blue-500'; // Using a distinct color for selected
     slotBgClass = 'bg-blue-500/20 hover:bg-blue-500/30';
-    tooltipMessage = 'Selected - Click to deselect, or confirm booking via main button.';
+    tooltipMessage = 'Selecionado - Clique para desmarcar ou confirme o agendamento no botão principal.';
   } else if (isBooked) {
     IconComponent = XCircle;
     iconColorClass = 'text-destructive';
     slotBgClass = 'bg-destructive/20 hover:bg-destructive/30 cursor-not-allowed';
-    tooltipMessage = `Booked: ${bookingDetails?.title || bookingDetails?.service || 'Event'}`;
+    tooltipMessage = `Agendado: ${bookingDetails?.title || bookingDetails?.service || 'Evento'}`;
     if (bookingDetails?.clientName) {
-      tooltipMessage += ` by ${bookingDetails.clientName}`;
+      tooltipMessage += ` por ${bookingDetails.clientName}`;
     }
     if (bookingDetails?.price !== undefined) {
-      tooltipMessage += ` - Price: $${bookingDetails.price}`;
+      tooltipMessage += ` - Preço: R$${bookingDetails.price.toFixed(2)}`;
     }
   } else if (isBuffer) {
     IconComponent = MinusCircle;
     iconColorClass = 'text-yellow-500';
     slotBgClass = 'bg-yellow-500/10 hover:bg-yellow-500/20 cursor-not-allowed';
-    tooltipMessage = `Buffer time (related to: ${bookingDetails?.title || bookingDetails?.service || 'Event'})`;
+    tooltipMessage = `Tempo de segurança (relacionado a: ${bookingDetails?.title || bookingDetails?.service || 'Evento'})`;
      if (bookingDetails?.price !== undefined) {
-      tooltipMessage += ` - Price: $${bookingDetails.price}`;
+      tooltipMessage += ` - Preço: R$${bookingDetails.price.toFixed(2)}`;
     }
   } else { // Available and not selected
     IconComponent = CheckCircle;
     iconColorClass = 'text-green-500';
     slotBgClass = 'bg-green-500/10 hover:bg-green-500/20'; // More distinct available color
-    tooltipMessage = 'Available - Click to select';
+    tooltipMessage = 'Disponível - Clique para selecionar';
   }
 
   const handleClick = () => {

@@ -8,9 +8,9 @@ export const exportCalendarAsImage = (elementId: string) => {
   const element = document.getElementById(elementId);
   if (element) {
     alert(
-      `This would export the element with ID "${elementId}" as an image.\n` +
-      `You would typically use a library like 'html2canvas' for this.\n\n` +
-      `Example usage (after installing html2canvas):\n` +
+      `Isso exportaria o elemento com ID "${elementId}" como uma imagem.\n` +
+      `Você normalmente usaria uma biblioteca como 'html2canvas' para isso.\n\n` +
+      `Exemplo de uso (após instalar o html2canvas):\n` +
       `import html2canvas from 'html2canvas';\n` +
       `html2canvas(element).then(canvas => {\n` +
       `  const image = canvas.toDataURL('image/png');\n` +
@@ -21,7 +21,7 @@ export const exportCalendarAsImage = (elementId: string) => {
       `});`
     );
   } else {
-    alert(`Element with ID "${elementId}" not found.`);
+    alert(`Elemento com ID "${elementId}" não encontrado.`);
   }
 };
 
@@ -29,9 +29,9 @@ export const exportCalendarAsPdf = (elementId: string) => {
   const element = document.getElementById(elementId);
   if (element) {
     alert(
-      `This would export the element with ID "${elementId}" as a PDF.\n` +
-      `You would typically use libraries like 'jspdf' and 'html2canvas' (or 'jspdf-html2canvas').\n\n` +
-      `Example usage (after installing jspdf and html2canvas):\n` +
+      `Isso exportaria o elemento com ID "${elementId}" como um PDF.\n` +
+      `Você normalmente usaria bibliotecas como 'jspdf' e 'html2canvas' (ou 'jspdf-html2canvas').\n\n` +
+      `Exemplo de uso (após instalar jspdf e html2canvas):\n` +
       `import jsPDF from 'jspdf';\n` +
       `import html2canvas from 'html2canvas';\n` +
       `html2canvas(element).then(canvas => {\n` +
@@ -45,6 +45,6 @@ export const exportCalendarAsPdf = (elementId: string) => {
       `});`
     );
   } else {
-    alert(`Element with ID "${elementId}" not found.`);
+    alert(`Elemento com ID "${elementId}" não encontrado.`);
   }
 };

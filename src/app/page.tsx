@@ -3,6 +3,7 @@
 
 import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { AppHeader } from '@/components/layout/header';
 import { CalendarView } from '@/components/calendar/calendar-view';
 import { Button } from '@/components/ui/button';
@@ -88,45 +89,45 @@ export default function HomePage() {
   };
 
   return (
-    <Suspense fallback={<div>Loading page content...</div>}>
+    <Suspense fallback={<div>Carregando conteúdo da página...</div>}>
       <div className="flex flex-col min-h-screen bg-background text-foreground">
         <AppHeader />
         <main className="flex-grow container mx-auto py-8 px-4 md:px-0">
           <div className="mb-8 p-6 bg-card rounded-lg shadow-lg">
-            <h2 className="text-2xl font-semibold mb-2 text-primary-foreground font-headline">Weekly Availability</h2>
+            <h2 className="text-2xl font-semibold mb-2 text-primary-foreground font-headline">Disponibilidade Semanal</h2>
             <p className="text-muted-foreground mb-1">
-              View your studio's schedule for the week (Monday to Saturday, {String(CALENDAR_START_HOUR).padStart(2, '0')}:00 - {String(CALENDAR_END_HOUR).padStart(2, '0')}:00).
+              Veja a agenda do seu estúdio para a semana (Segunda a Sábado, das {String(CALENDAR_START_HOUR).padStart(2, '0')}:00 às {String(CALENDAR_END_HOUR).padStart(2, '0')}:00).
             </p>
             <ul className="text-muted-foreground list-none pl-0 mb-6 space-y-1 text-sm">
-              <li className="flex items-center"><CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Available slot</li>
-              <li className="flex items-center"><XCircle className="mr-2 h-4 w-4 text-destructive" /> Booked slot</li>
-              <li className="flex items-center"><MinusCircle className="mr-2 h-4 w-4 text-yellow-500" /> Buffer time (1 hour before/after booking)</li>
-              <li className="flex items-center"><CheckSquare className="mr-2 h-4 w-4 text-blue-500" /> Slot selected for booking</li>
+              <li className="flex items-center"><CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Horário disponível</li>
+              <li className="flex items-center"><XCircle className="mr-2 h-4 w-4 text-destructive" /> Horário agendado</li>
+              <li className="flex items-center"><MinusCircle className="mr-2 h-4 w-4 text-yellow-500" /> Tempo de segurança (1 hora antes/depois do agendamento)</li>
+              <li className="flex items-center"><CheckSquare className="mr-2 h-4 w-4 text-blue-500" /> Horário selecionado para agendamento</li>
             </ul>
-            <p className="text-muted-foreground mb-6">Select available slots and fill in the details below to make a reservation.</p>
+            <p className="text-muted-foreground mb-6">Selecione os horários disponíveis e preencha os detalhes abaixo para fazer uma reserva.</p>
             <div className="flex flex-wrap gap-4 mb-6">
               <Button 
                 onClick={() => exportCalendarAsImage(calendarExportId)} 
                 variant="outline"
                 className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
-                aria-label="Export calendar as image"
+                aria-label="Exportar calendário como imagem"
               >
-                <ImageIcon className="mr-2 h-4 w-4" /> Export as Image
+                <ImageIcon className="mr-2 h-4 w-4" /> Exportar como Imagem
               </Button>
               <Button 
                 onClick={() => exportCalendarAsPdf(calendarExportId)} 
                 variant="outline"
                 className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
-                aria-label="Export calendar as PDF"
+                aria-label="Exportar calendário como PDF"
               >
-                <FileText className="mr-2 h-4 w-4" /> Export as PDF
+                <FileText className="mr-2 h-4 w-4" /> Exportar como PDF
               </Button>
               <Button 
                 onClick={() => setIsShareDialogOpen(true)} 
                 className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                aria-label="Share calendar availability"
+                aria-label="Compartilhar disponibilidade do calendário"
               >
-                <Share2 className="mr-2 h-4 w-4" /> Share Availability
+                <Share2 className="mr-2 h-4 w-4" /> Compartilhar Disponibilidade
               </Button>
             </div>
           </div>
@@ -144,7 +145,7 @@ export default function HomePage() {
           <div className="mt-12 p-6 bg-card rounded-lg shadow-lg">
             <h3 className="text-xl font-semibold mb-4 text-primary-foreground flex items-center">
               <BarChart3 className="mr-2 h-6 w-6 text-primary" />
-              Monthly Recipe for {format(displayedDate, 'MMMM yyyy')}
+              Receita Mensal de {format(displayedDate, 'MMMM yyyy', { locale: ptBR })}
             </h3>
             {Object.keys(monthlyRecipe).length > 0 ? (
               <ul className="space-y-3">
@@ -153,30 +154,30 @@ export default function HomePage() {
                     <div className="flex justify-between items-center">
                       <div>
                         <strong className="text-primary-foreground">{clientName}:</strong> 
-                        <span className="ml-2 text-foreground">{data.totalHours.toFixed(1)} hours</span>
-                        <span className="ml-2 text-muted-foreground">(@ R${data.pricePerHour.toFixed(2)}/hr)</span>
+                        <span className="ml-2 text-foreground">{data.totalHours.toFixed(1)} horas</span>
+                        <span className="ml-2 text-muted-foreground">(@ R${data.pricePerHour.toFixed(2)}/hora)</span>
                         <span className="ml-2 font-semibold text-accent">Total: R${data.totalAmount.toFixed(2)}</span>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => toggleClientExpansion(clientName)} className="text-accent hover:text-accent/80">
                         {expandedClients[clientName] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        {expandedClients[clientName] ? 'See Less' : 'See More'}
+                        {expandedClients[clientName] ? 'Ver Menos' : 'Ver Mais'}
                       </Button>
                     </div>
                     {expandedClients[clientName] && (
                       <div className="mt-3 pt-3 border-t border-border/50">
-                        <h4 className="text-sm font-semibold text-muted-foreground mb-2">Bookings:</h4>
+                        <h4 className="text-sm font-semibold text-muted-foreground mb-2">Agendamentos:</h4>
                         <ul className="space-y-1 text-xs">
                           {bookings
                             .filter(b => b.clientName === clientName && format(new Date(b.startTime), 'yyyy-MM') === format(displayedDate, 'yyyy-MM'))
                             .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
                             .map(booking => {
                                const project = allProjectsData.find(p => p.id === booking.projectId);
-                               const projectName = project ? project.name : "Unknown Project";
+                               const projectName = project ? project.name : "Projeto Desconhecido";
                                return (
                                 <li key={booking.id} className="p-2 bg-muted/30 rounded">
-                                    <span className="font-medium">{format(new Date(booking.startTime), 'MMM d, HH:mm')}</span> - 
-                                    Project: {projectName} - 
-                                    {booking.service || 'Session'} 
+                                    <span className="font-medium">{format(new Date(booking.startTime), 'd MMM, HH:mm', { locale: ptBR })}</span> - 
+                                    Projeto: {projectName} - 
+                                    {booking.service || 'Sessão'} 
                                     ({calculateBookingDurationInHours(booking).toFixed(1)} hrs)
                                     {booking.price && ` - R$${booking.price.toFixed(2)}`}
                                 </li>
@@ -189,13 +190,13 @@ export default function HomePage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-muted-foreground">No bookings found for this month to generate a recipe.</p>
+              <p className="text-muted-foreground">Nenhum agendamento encontrado para este mês para gerar uma receita.</p>
             )}
           </div>
         </main>
 
         <footer className="py-6 text-center text-sm text-muted-foreground border-t border-border/50">
-          © {new Date().getFullYear()} SessionSnap. All rights reserved.
+          © {new Date().getFullYear()} SessionSnap. Todos os direitos reservados.
         </footer>
 
         <ShareDialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen} studioName="SessionSnap Studio" calendarLink="https://example.com/sessionsnap/book" />
@@ -203,4 +204,3 @@ export default function HomePage() {
     </Suspense>
   );
 }
-
