@@ -16,7 +16,7 @@ export function AppHeader() {
           <Link href="/" className="text-foreground hover:text-primary transition-colors text-sm font-medium">
             Calendar
           </Link>
-          <Link href="/manage" className="text-foreground hover:text-primary transition-colors text-sm font-medium flex items-center gap-1.5">
+          <Link href="/manage-projects" className="text-foreground hover:text-primary transition-colors text-sm font-medium flex items-center gap-1.5">
             <FolderGit2 className="h-5 w-5" />
             Manage Clients & Projects
           </Link>
