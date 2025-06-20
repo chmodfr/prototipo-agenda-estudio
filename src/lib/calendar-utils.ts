@@ -47,11 +47,16 @@ export function checkSlotAvailability(
 ): { isBooked: boolean; isBuffer: boolean; bookingDetails?: Booking } {
   const slotEndTime = addHours(slotTime, 1);
 
+  // Phase 1: Check for direct booking
+  // A slot is directly booked if its time range overlaps with any booking's time range.
   for (const booking of bookings) {
     const bookingStartTime = booking.startTime;
     const bookingEndTime = booking.endTime;
 
-    // Check for direct booking overlap
+    // Direct overlap conditions:
+    // 1. Slot starts during the booking.
+    // 2. Slot ends during the booking.
+    // 3. Booking is entirely contained within the slot.
     if (
       (slotTime >= bookingStartTime && slotTime < bookingEndTime) ||
       (slotEndTime > bookingStartTime && slotEndTime <= bookingEndTime) ||
@@ -59,16 +64,23 @@ export function checkSlotAvailability(
     ) {
       return { isBooked: true, isBuffer: false, bookingDetails: booking };
     }
+  }
 
-    // Check for buffer zone overlap
+  // Phase 2: Check for buffer zone, only if not directly booked
+  // A slot is a buffer if it's adjacent (within BUFFER_HOURS) to a booking,
+  // but not overlapping the booking itself.
+  for (const booking of bookings) {
+    const bookingStartTime = booking.startTime;
+    const bookingEndTime = booking.endTime;
+
     const bufferBeforeStart = subHours(bookingStartTime, BUFFER_HOURS);
     const bufferAfterEnd = addHours(bookingEndTime, BUFFER_HOURS);
 
-    // Is the slot within buffer before?
+    // Check if the slot falls into the buffer period BEFORE the booking
     if (slotTime >= bufferBeforeStart && slotTime < bookingStartTime) {
       return { isBooked: false, isBuffer: true, bookingDetails: booking };
     }
-    // Is the slot within buffer after?
+    // Check if the slot falls into the buffer period AFTER the booking
     if (slotTime >= bookingEndTime && slotTime < bufferAfterEnd) {
       return { isBooked: false, isBuffer: true, bookingDetails: booking };
     }

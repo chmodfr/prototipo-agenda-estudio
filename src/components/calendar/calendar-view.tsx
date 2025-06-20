@@ -31,7 +31,6 @@ export function CalendarView() {
   useEffect(() => {
     const newWeekDates = getWeekDates(currentDate);
     setWeekDates(newWeekDates);
-    // Initial bookings load - this could also come from a DB
     setBookings(getMockBookings(newWeekDates));
   }, [currentDate]);
 
@@ -59,25 +58,23 @@ export function CalendarView() {
 
   const handlePrevWeek = () => {
     setCurrentDate(prev => new Date(prev.setDate(prev.getDate() - 7)));
-    setSelectedSlots([]); // Clear selection when changing week
+    setSelectedSlots([]); 
   };
 
   const handleNextWeek = () => {
     setCurrentDate(prev => new Date(prev.setDate(prev.getDate() + 7)));
-    setSelectedSlots([]); // Clear selection when changing week
+    setSelectedSlots([]); 
   };
 
   const handleToday = () => {
     setCurrentDate(new Date());
-    setSelectedSlots([]); // Clear selection when going to today
+    setSelectedSlots([]); 
   };
 
   const handleSlotClick = (slotTime: Date) => {
     const { isBooked, isBuffer } = checkSlotAvailability(slotTime, bookings);
     
-    // Prevent selecting already booked or buffer slots
     if (isBooked || isBuffer) {
-        // Allow deselecting if it was somehow selected (should not happen with current logic)
         setSelectedSlots(prevSelected => prevSelected.filter(s => s.getTime() !== slotTime.getTime()));
         return;
     }
@@ -85,9 +82,9 @@ export function CalendarView() {
     setSelectedSlots(prevSelected => {
       const index = prevSelected.findIndex(s => s.getTime() === slotTime.getTime());
       if (index > -1) {
-        return prevSelected.filter(s => s.getTime() !== slotTime.getTime()); // Deselect
+        return prevSelected.filter(s => s.getTime() !== slotTime.getTime()); 
       } else {
-        return [...prevSelected, slotTime]; // Select
+        return [...prevSelected, slotTime]; 
       }
     });
   };
@@ -102,21 +99,50 @@ export function CalendarView() {
       return;
     }
 
+    const clientName = window.prompt("Enter client name:", "New Client");
+    if (!clientName) {
+      toast({ title: "Booking Cancelled", description: "Client name is required.", variant: "destructive" });
+      setSelectedSlots([]); // Clear selection if booking is cancelled
+      return;
+    }
+
+    const serviceDetails = window.prompt("Enter service details (e.g., Vocal Recording, Mixing):", "Session");
+    if (!serviceDetails) {
+      toast({ title: "Booking Cancelled", description: "Service details are required.", variant: "destructive" });
+      setSelectedSlots([]); // Clear selection
+      return;
+    }
+
+    const priceInput = window.prompt("Enter price for the session(s):", "50");
+    let price = 0;
+    if (priceInput !== null) {
+        price = parseFloat(priceInput);
+        if (isNaN(price)) {
+            toast({ title: "Invalid Price", description: "Price was not a valid number. Defaulting to 0.", variant: "destructive" });
+            price = 0;
+        }
+    } else { // User cancelled the price prompt
+        toast({ title: "Booking Cancelled", description: "Price input was cancelled.", variant: "destructive" });
+        setSelectedSlots([]); // Clear selection
+        return;
+    }
+
+
     const newBookings: Booking[] = selectedSlots.map(slotTimeToBook => ({
       id: `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       startTime: slotTimeToBook,
-      endTime: addHours(slotTimeToBook, 1),
-      clientName: 'Test Client',
-      service: 'Confirmed Session',
-      title: 'Confirmed Session (Test)',
-      price: 60, // Default price for new confirmed bookings
+      endTime: addHours(slotTimeToBook, 1), // Assuming 1-hour slots for now
+      clientName: clientName,
+      service: serviceDetails,
+      title: `${clientName} - ${serviceDetails}`,
+      price: price,
     }));
 
     setBookings(prevBookings => [...prevBookings, ...newBookings]);
-    setSelectedSlots([]); // Clear selection after booking
+    setSelectedSlots([]); 
     toast({
       title: 'Booking Confirmed!',
-      description: `${newBookings.length} slot(s) booked successfully. Buffers updated.`,
+      description: `${newBookings.length} slot(s) booked for ${clientName}. Buffers will now reflect these bookings.`,
     });
   };
 
