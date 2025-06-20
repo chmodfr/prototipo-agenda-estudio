@@ -61,10 +61,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { sampleClients, sampleProjects, sampleBookings } from '@/lib/sample-firestore-data';
+import { calculateProjectCost } from '@/lib/calendar-utils';
 import type { ClientDocument, ProjectDocument, BookingDocument, BillingType, PacoteType } from '@/types/firestore';
-import { Pencil, PlusCircle, Trash2, ArrowLeft } from 'lucide-react';
+import { Pencil, PlusCircle, Trash2, ArrowLeft, FileText, Copy } from 'lucide-react';
 
 // Zod Schemas for form validation
 const clientSchema = z.object({
@@ -77,6 +80,7 @@ const projectSchema = z.object({
   billingType: z.enum(['pacote', 'personalizado'], { required_error: "Selecione um tipo de cobrança." }),
   pacoteSelecionado: z.enum(["Avulso", "Pacote 10h", "Pacote 20h", "Pacote 40h"]).optional(),
   customRate: z.coerce.number().min(0, "O valor deve ser positivo.").optional(),
+  targetHours: z.coerce.number().min(1, "A meta de horas deve ser de pelo menos 1.").optional(),
 }).refine(data => {
   if (data.billingType === 'pacote' && !data.pacoteSelecionado) {
     return false;
@@ -109,13 +113,19 @@ export default function ManageProjectsClientsPage() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isDeleteClientDialogOpen, setIsDeleteClientDialogOpen] = useState(false);
   const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
-  // State for tracking what is being edited/deleted
+  // State for tracking what is being edited/deleted/viewed
   const [editingClient, setEditingClient] = useState<ClientDocument | null>(null);
   const [editingProject, setEditingProject] = useState<ProjectDocument | null>(null);
   const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [addingProjectForClientId, setAddingProjectForClientId] = useState<string | null>(null);
+  
+  // State for receipt modal
+  const [receiptText, setReceiptText] = useState('');
+  const [receiptDetails, setReceiptDetails] = useState<{ clientName: string, projectName: string } | null>(null);
+
 
   // React Hook Form instances
   const clientForm = useForm<z.infer<typeof clientSchema>>({
@@ -156,10 +166,10 @@ export default function ManageProjectsClientsPage() {
 
   // CRUD Operations
   const onClientSubmit = (data: z.infer<typeof clientSchema>) => {
-    if (editingClient) { // Editing existing client
+    if (editingClient) { 
       setClients(clients.map(c => c.id === editingClient.id ? { ...c, ...data } : c));
       toast({ title: "Cliente Atualizado!", description: `O cliente "${data.name}" foi atualizado.` });
-    } else { // Adding new client
+    } else { 
       const newClient = { id: `client_${Date.now()}`, ...data };
       setClients([...clients, newClient]);
       toast({ title: "Cliente Adicionado!", description: `O cliente "${data.name}" foi criado.` });
@@ -168,18 +178,23 @@ export default function ManageProjectsClientsPage() {
   };
 
   const onProjectSubmit = (data: z.infer<typeof projectSchema>) => {
-    if (editingProject) { // Editing existing project
+    if (editingProject) { 
       const updatedProject = { ...editingProject, ...data };
       setProjects(projects.map(p => p.id === editingProject.id ? updatedProject : p));
       toast({ title: "Projeto Atualizado!", description: `O projeto "${data.name}" foi atualizado.` });
-    } else if (addingProjectForClientId) { // Adding new project
-      const newProject = { 
+    } else if (addingProjectForClientId) {
+      const newProjectData: ProjectDocument = { 
         id: `project_${Date.now()}`, 
         clientId: addingProjectForClientId,
         createdAt: new Date(),
-        ...data 
+        name: data.name,
+        billingType: data.billingType,
       };
-      setProjects([...projects, newProject]);
+      if (data.billingType === 'pacote') newProjectData.pacoteSelecionado = data.pacoteSelecionado;
+      if (data.billingType === 'personalizado') newProjectData.customRate = data.customRate;
+      if (data.targetHours) newProjectData.targetHours = data.targetHours;
+
+      setProjects([...projects, newProjectData]);
       toast({ title: "Projeto Adicionado!", description: `O projeto "${data.name}" foi criado.` });
     }
     setIsProjectModalOpen(false);
@@ -188,8 +203,6 @@ export default function ManageProjectsClientsPage() {
   const confirmDeleteClient = () => {
     if (!deletingClientId) return;
     const clientName = clients.find(c => c.id === deletingClientId)?.name;
-    // Cascade delete: remove client, their projects, and their bookings
-    const clientProjectIds = projects.filter(p => p.clientId === deletingClientId).map(p => p.id);
     setBookings(bookings.filter(b => b.clientId !== deletingClientId));
     setProjects(projects.filter(p => p.clientId !== deletingClientId));
     setClients(clients.filter(c => c.id !== deletingClientId));
@@ -202,7 +215,6 @@ export default function ManageProjectsClientsPage() {
   const confirmDeleteProject = () => {
     if (!deletingProjectId) return;
     const projectName = projects.find(p => p.id === deletingProjectId)?.name;
-    // Cascade delete: remove project and its bookings
     setBookings(bookings.filter(b => b.projectId !== deletingProjectId));
     setProjects(projects.filter(p => p.id !== deletingProjectId));
 
@@ -210,6 +222,79 @@ export default function ManageProjectsClientsPage() {
     setIsDeleteProjectDialogOpen(false);
     setDeletingProjectId(null);
   };
+  
+  // Receipt Generation Logic
+  const handleGenerateReceipt = (project: ProjectDocument, client: ClientDocument) => {
+    const projectBookings = bookings.filter(b => b.projectId === project.id);
+
+    const mergeSessions = (sessions: BookingDocument[]) => {
+        if (sessions.length === 0) return [];
+        const sorted = [...sessions].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        const merged: { start: Date; end: Date }[] = [];
+        if (sorted.length === 0) return merged;
+        
+        let currentSession = { start: new Date(sorted[0].startTime), end: new Date(sorted[0].endTime) };
+        for (let i = 1; i < sorted.length; i++) {
+            const nextSessionStart = new Date(sorted[i].startTime);
+            const nextSessionEnd = new Date(sorted[i].endTime);
+            if (Math.abs(currentSession.end.getTime() - nextSessionStart.getTime()) < 1000) { // Compare within 1s tolerance
+                currentSession.end = nextSessionEnd;
+            } else {
+                merged.push(currentSession);
+                currentSession = { start: nextSessionStart, end: nextSessionEnd };
+            }
+        }
+        merged.push(currentSession);
+        return merged;
+    };
+
+    const dailySessions: Record<string, BookingDocument[]> = {};
+    projectBookings.forEach(booking => {
+        const dayKey = format(new Date(booking.startTime), 'yyyy-MM-dd');
+        if (!dailySessions[dayKey]) dailySessions[dayKey] = [];
+        dailySessions[dayKey].push(booking);
+    });
+
+    const mergedDailySessions: { day: string, ranges: string[] }[] = [];
+    Object.keys(dailySessions).sort().forEach(dayKey => {
+        const merged = mergeSessions(dailySessions[dayKey]);
+        const ranges = merged.map(session => 
+            `${format(session.start, 'HH:mm')} – ${format(session.end, 'HH:mm')}`
+        );
+        mergedDailySessions.push({ day: format(new Date(dayKey), 'dd/MM/yyyy', { locale: ptBR }), ranges });
+    });
+
+    const costMetrics = calculateProjectCost(projectBookings, [project]);
+    if (!costMetrics) {
+      toast({ title: "Erro ao calcular custo", description: "Não foi possível gerar o recibo.", variant: "destructive"});
+      return;
+    }
+
+    let receipt = `RECIBO DE SERVIÇOS\n`;
+    receipt += `----------------------------------------\n`;
+    receipt += `Cliente: ${client.name}\n`;
+    receipt += `Projeto: ${project.name}\n\n`;
+    receipt += `DATAS E HORÁRIOS DAS SESSÕES:\n`;
+    mergedDailySessions.forEach(sessionDay => {
+        receipt += `- ${sessionDay.day}: ${sessionDay.ranges.join(', ')}\n`;
+    });
+    receipt += `\n`;
+    receipt += `DETALHAMENTO FINANCEIRO:\n`;
+    receipt += `- Total de Horas: ${costMetrics.totalHours.toFixed(2)}h\n`;
+    receipt += `- Valor por Hora: R$${costMetrics.pricePerHour.toFixed(2)}\n`;
+    receipt += `----------------------------------------\n`;
+    receipt += `VALOR TOTAL: R$${costMetrics.totalAmount.toFixed(2)}\n`;
+
+    setReceiptDetails({ clientName: client.name, projectName: project.name });
+    setReceiptText(receipt);
+    setIsReceiptModalOpen(true);
+  };
+  
+  const handleCopyReceipt = () => {
+    navigator.clipboard.writeText(receiptText);
+    toast({ title: "Recibo Copiado!", description: "O texto do recibo foi copiado para a área de transferência." });
+  };
+
 
   return (
     <Suspense fallback={<div className="p-8">Carregando página de gerenciamento...</div>}>
@@ -264,70 +349,106 @@ export default function ManageProjectsClientsPage() {
 
                 {projects
                   .filter(p => p.clientId === client.id && p.id !== 'project_general_calendar')
-                  .map(project => (
-                    <Accordion type="single" collapsible className="w-full mb-4 border border-border rounded-md" key={project.id}>
-                      <AccordionItem value={project.id} className="border-b-0">
-                        <AccordionTrigger className="hover:no-underline bg-secondary/30 hover:bg-secondary/50 px-4 py-3 rounded-t-md">
-                          <div className="flex justify-between w-full items-center">
-                            <span className="font-medium text-lg text-primary-foreground">{project.name}</span>
-                            <span className="text-xs text-muted-foreground pr-2">
-                              Criado: {format(new Date(project.createdAt), 'd MMM, yyyy', { locale: ptBR })}
-                            </span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-4 py-4 bg-card rounded-b-md">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                            <div>
-                                <p className="text-sm"><strong className="text-muted-foreground">Tipo de Cobrança:</strong> <span className="font-medium">{project.billingType}</span></p>
-                                {project.billingType === 'pacote' && project.pacoteSelecionado && (
-                                <p className="text-sm"><strong className="text-muted-foreground">Pacote:</strong> <span className="font-medium">{project.pacoteSelecionado}</span></p>
-                                )}
-                                {project.billingType === 'personalizado' && typeof project.customRate === 'number' && (
-                                <p className="text-sm"><strong className="text-muted-foreground">Valor Personalizado:</strong> <span className="font-medium">R${project.customRate.toFixed(2)}/hora</span></p>
-                                )}
+                  .map(project => {
+                    const projectBookings = bookings.filter(b => b.projectId === project.id);
+                    const totalBookedHours = projectBookings.reduce((acc, booking) => acc + booking.duration, 0);
+                    const targetHours = project.targetHours || 0;
+                    const progressPercentage = targetHours > 0 ? Math.min((totalBookedHours / targetHours) * 100, 100) : 0;
+                    const isCompleted = targetHours > 0 && totalBookedHours >= targetHours;
+                    const status = isCompleted ? 'Completo' : 'Em Execução';
+
+                    return (
+                      <Accordion type="single" collapsible className="w-full mb-4 border border-border rounded-md" key={project.id}>
+                        <AccordionItem value={project.id} className="border-b-0">
+                          <AccordionTrigger className="hover:no-underline bg-secondary/30 hover:bg-secondary/50 px-4 py-3 rounded-t-md">
+                            <div className="flex justify-between w-full items-center">
+                              <span className="font-medium text-lg text-primary-foreground">{project.name}</span>
+                              <span className="text-xs text-muted-foreground pr-2">
+                                Criado: {format(new Date(project.createdAt), 'd MMM, yyyy', { locale: ptBR })}
+                              </span>
                             </div>
-                            <div className="flex md:justify-end items-start gap-2">
-                                <Button onClick={() => handleOpenProjectModal(project, client.id)} variant="outline" size="sm" className="border-accent text-accent hover:bg-accent hover:text-accent-foreground">
-                                <Pencil className="mr-1 h-4 w-4" /> Editar Projeto
-                                </Button>
-                                <Button onClick={() => handleOpenDeleteProjectDialog(project.id)} variant="destructive" size="sm" className="bg-destructive/80 hover:bg-destructive">
-                                <Trash2 className="mr-1 h-4 w-4" /> Excluir Projeto
-                                </Button>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-4 py-4 bg-card rounded-b-md">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                              <div>
+                                  <p className="text-sm"><strong className="text-muted-foreground">Tipo de Cobrança:</strong> <span className="font-medium">{project.billingType}</span></p>
+                                  {project.billingType === 'pacote' && project.pacoteSelecionado && (
+                                  <p className="text-sm"><strong className="text-muted-foreground">Pacote:</strong> <span className="font-medium">{project.pacoteSelecionado}</span></p>
+                                  )}
+                                  {project.billingType === 'personalizado' && typeof project.customRate === 'number' && (
+                                  <p className="text-sm"><strong className="text-muted-foreground">Valor Personalizado:</strong> <span className="font-medium">R${project.customRate.toFixed(2)}/hora</span></p>
+                                  )}
+                              </div>
+                              <div className="flex md:justify-end items-start gap-2">
+                                  <Button onClick={() => handleOpenProjectModal(project, client.id)} variant="outline" size="sm" className="border-accent text-accent hover:bg-accent hover:text-accent-foreground">
+                                  <Pencil className="mr-1 h-4 w-4" /> Editar Projeto
+                                  </Button>
+                                  <Button onClick={() => handleOpenDeleteProjectDialog(project.id)} variant="destructive" size="sm" className="bg-destructive/80 hover:bg-destructive">
+                                  <Trash2 className="mr-1 h-4 w-4" /> Excluir Projeto
+                                  </Button>
+                              </div>
                             </div>
-                          </div>
-                          
-                          <h4 className="text-md font-semibold mt-6 mb-2 text-primary-foreground">Agendamentos para este projeto:</h4>
-                          {bookings.filter(b => b.projectId === project.id).length > 0 ? (
-                            <div className="overflow-x-auto rounded-md border border-border">
-                              <Table>
-                                <TableHeader className="bg-muted/30">
-                                  <TableRow>
-                                    <TableHead className="text-foreground">Horário de Início</TableHead>
-                                    <TableHead className="text-foreground">Horário de Fim</TableHead>
-                                    <TableHead className="text-foreground text-right">Duração (hrs)</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {bookings
-                                    .filter(b => b.projectId === project.id)
-                                    .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                                    .map(booking => (
-                                      <TableRow key={booking.id} className="hover:bg-muted/10">
-                                        <TableCell>{format(new Date(booking.startTime), 'd MMM, yyyy HH:mm', { locale: ptBR })}</TableCell>
-                                        <TableCell>{format(new Date(booking.endTime), 'd MMM, yyyy HH:mm', { locale: ptBR })}</TableCell>
-                                        <TableCell className="text-right">{booking.duration.toFixed(2)}</TableCell>
-                                      </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                            
+                            <div className="mt-4 space-y-3 p-3 bg-secondary/20 rounded-md">
+                              <div className="flex justify-between items-center">
+                                <p className="text-sm font-medium">Status do Projeto:</p>
+                                <span className={`text-sm font-semibold px-2 py-1 rounded-full ${isCompleted ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
+                                    {status}
+                                </span>
+                              </div>
+                              <div>
+                                  <div className="flex justify-between text-sm text-muted-foreground mb-1">
+                                      <span>Progresso das Horas</span>
+                                      <span>{totalBookedHours.toFixed(1)} / {targetHours}h</span>
+                                  </div>
+                                  <Progress value={progressPercentage} className="h-2" />
+                              </div>
+                              {isCompleted && (
+                                  <div className="pt-2 flex justify-end">
+                                      <Button 
+                                          onClick={() => handleGenerateReceipt(project, client)}
+                                          variant="outline"
+                                          size="sm"
+                                          className="border-green-400 text-green-400 hover:bg-green-500 hover:text-white"
+                                      >
+                                          <FileText className="mr-2 h-4 w-4" />
+                                          Gerar Recibo
+                                      </Button>
+                                  </div>
+                              )}
                             </div>
-                          ) : (
-                            <p className="text-muted-foreground">Nenhum agendamento para este projeto ainda.</p>
-                          )}
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                ))}
+
+                            <h4 className="text-md font-semibold mt-6 mb-2 text-primary-foreground">Agendamentos para este projeto:</h4>
+                            {projectBookings.length > 0 ? (
+                              <div className="overflow-x-auto rounded-md border border-border">
+                                <Table>
+                                  <TableHeader className="bg-muted/30">
+                                    <TableRow>
+                                      <TableHead className="text-foreground">Horário de Início</TableHead>
+                                      <TableHead className="text-foreground">Horário de Fim</TableHead>
+                                      <TableHead className="text-foreground text-right">Duração (hrs)</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {projectBookings
+                                      .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                                      .map(booking => (
+                                        <TableRow key={booking.id} className="hover:bg-muted/10">
+                                          <TableCell>{format(new Date(booking.startTime), 'd MMM, yyyy HH:mm', { locale: ptBR })}</TableCell>
+                                          <TableCell>{format(new Date(booking.endTime), 'd MMM, yyyy HH:mm', { locale: ptBR })}</TableCell>
+                                          <TableCell className="text-right">{booking.duration.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            ) : (
+                              <p className="text-muted-foreground">Nenhum agendamento para este projeto ainda.</p>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                  )})}
               </CardContent>
             </Card>
           ))}
@@ -430,6 +551,11 @@ export default function ManageProjectsClientsPage() {
                   {projectForm.formState.errors.pacoteSelecionado && <p className="text-destructive text-sm">{projectForm.formState.errors.pacoteSelecionado.message}</p>}
                 </div>
               )}
+              <div className="space-y-2">
+                  <Label htmlFor="targetHours">Meta de Horas do Projeto</Label>
+                  <Input id="targetHours" type="number" {...projectForm.register('targetHours')} placeholder="ex: 20"/>
+                  {projectForm.formState.errors.targetHours && <p className="text-destructive text-sm">{projectForm.formState.errors.targetHours.message}</p>}
+                </div>
             </div>
              <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Cancelar</Button></DialogClose>
@@ -470,6 +596,38 @@ export default function ManageProjectsClientsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Receipt Modal */}
+      <Dialog open={isReceiptModalOpen} onOpenChange={setIsReceiptModalOpen}>
+        <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Recibo para {receiptDetails?.projectName}</DialogTitle>
+                <DialogDescription>
+                    Cliente: {receiptDetails?.clientName}. Verifique os detalhes abaixo.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="my-4">
+                <Label htmlFor="receipt-text">Conteúdo do Recibo</Label>
+                <Textarea
+                    id="receipt-text"
+                    readOnly
+                    value={receiptText}
+                    className="h-80 font-mono text-sm bg-muted/50 resize-none"
+                />
+            </div>
+            <DialogFooter className="gap-2 sm:justify-start">
+                <Button onClick={handleCopyReceipt}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copiar Texto
+                </Button>
+                <DialogClose asChild>
+                    <Button type="button" variant="secondary">
+                        Fechar
+                    </Button>
+                </DialogClose>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
     </Suspense>
   );
 }

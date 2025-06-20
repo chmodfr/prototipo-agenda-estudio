@@ -19,6 +19,7 @@ export interface ProjectDocument {
   billingType: BillingType;
   pacoteSelecionado?: PacoteType; // Deve estar presente se o billingType for "pacote"
   customRate?: number; // Deve estar presente se o billingType for "personalizado"
+  targetHours?: number; // Opcional: meta de horas para o projeto
   createdAt: Date; // No Firestore, isso será um Timestamp do servidor
 }
 
