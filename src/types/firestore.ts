@@ -5,8 +5,12 @@
 
 export interface ClientDocument {
   id: string;
-  name: string;
+  name: string; // "Razão Social" na UI
   phone: string;
+  cnpj: string;
+  email?: string;
+  whatsapp?: string;
+  observacoes?: string;
 }
 
 export type BillingType = "pacote" | "personalizado";
@@ -24,7 +28,7 @@ export interface ProjectDocument {
 }
 
 export interface BookingDocument {
-  id: string;
+  id:string;
   clientId: string; // Referência ao ID do documento da coleção /clients
   projectId: string; // Referência ao ID do documento da coleção /projects
   startTime: Date; // No Firestore, isso será um Timestamp

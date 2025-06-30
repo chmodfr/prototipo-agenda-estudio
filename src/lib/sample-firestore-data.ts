@@ -10,10 +10,39 @@ const calculateDuration = (start: Date, end: Date): number => {
 
 // Clientes de Amostra
 export const sampleClients: ClientDocument[] = [
-  { id: 'client_001', name: 'Estúdio Som & Arte', phone: '+55 11 98888-1111' },
-  { id: 'client_002', name: 'Rádio Onda Sonora', phone: '+55 21 97777-2222' },
-  { id: 'client_003', name: 'Produtora Visão Digital', phone: '+55 31 96666-3333' },
-  { id: 'client_internal_000', name: 'Studio Internal', phone: '+55 00 00000-0000'}
+  { 
+    id: 'client_001', 
+    name: 'Estúdio Som & Arte', 
+    phone: '+55 11 98888-1111',
+    cnpj: '12.345.678/0001-99',
+    email: 'contato@somarte.com',
+    whatsapp: '+55 11 98888-1111',
+    observacoes: 'Cliente antigo, priorizar agendamentos. Preferem contato via WhatsApp.'
+  },
+  { 
+    id: 'client_002', 
+    name: 'Rádio Onda Sonora', 
+    phone: '+55 21 97777-2222',
+    cnpj: '98.765.432/0001-11',
+    email: 'producao@ondasonora.com.br',
+    whatsapp: '+55 21 97777-2222',
+    observacoes: 'Pagamentos sempre no dia 15.'
+  },
+  { 
+    id: 'client_003', 
+    name: 'Produtora Visão Digital', 
+    phone: '+55 31 96666-3333',
+    cnpj: '11.222.333/0001-44',
+    email: 'financeiro@visaodigital.com',
+    observacoes: ''
+  },
+  { 
+    id: 'client_internal_000', 
+    name: 'Studio Internal', 
+    phone: '+55 00 00000-0000',
+    cnpj: '00.000.000/0000-00',
+    email: 'internal@studio.com',
+  }
 ];
 
 // Projetos de Amostra

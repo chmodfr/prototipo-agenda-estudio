@@ -51,6 +51,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -63,16 +68,22 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from '@/hooks/use-toast';
 import { sampleClients, sampleProjects, sampleBookings } from '@/lib/sample-firestore-data';
 import { calculateProjectCost } from '@/lib/calendar-utils';
+import { cn } from "@/lib/utils";
 import type { ClientDocument, ProjectDocument, BookingDocument, BillingType, PacoteType } from '@/types/firestore';
-import { Pencil, PlusCircle, Trash2, ArrowLeft, FileText, Copy, BarChartHorizontal } from 'lucide-react';
+import { Pencil, PlusCircle, Trash2, ArrowLeft, FileText, Copy, BarChartHorizontal, CalendarIcon } from 'lucide-react';
 
 // Zod Schemas for form validation
 const clientSchema = z.object({
-  name: z.string().min(2, { message: "O nome do cliente é obrigatório." }),
+  name: z.string().min(2, { message: "A razão social é obrigatória." }),
   phone: z.string().min(10, { message: "O telefone deve ter pelo menos 10 dígitos." }),
+  cnpj: z.string().min(14, { message: "O CNPJ deve ter pelo menos 14 dígitos." }),
+  email: z.string().email({ message: "Por favor, insira um e-mail válido." }).optional().or(z.literal('')),
+  whatsapp: z.string().optional(),
+  observacoes: z.string().optional(),
 });
 
 const projectSchema = z.object({
@@ -115,6 +126,7 @@ export default function ManageProjectsClientsPage() {
   const [isDeleteClientDialogOpen, setIsDeleteClientDialogOpen] = useState(false);
   const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [isNotaFiscalModalOpen, setIsNotaFiscalModalOpen] = useState(false);
 
   // State for tracking what is being edited/deleted/viewed
   const [editingClient, setEditingClient] = useState<ClientDocument | null>(null);
@@ -126,6 +138,13 @@ export default function ManageProjectsClientsPage() {
   // State for receipt modal
   const [receiptText, setReceiptText] = useState('');
   const [receiptDetails, setReceiptDetails] = useState<{ clientName: string, projectName: string } | null>(null);
+  
+  // State for Nota Fiscal modal
+  const [generatingNotaForClient, setGeneratingNotaForClient] = useState<ClientDocument | null>(null);
+  const [notaFiscalValue, setNotaFiscalValue] = useState('');
+  const [notaFiscalDate, setNotaFiscalDate] = useState<Date | undefined>(new Date());
+  const [generatedNotaText, setGeneratedNotaText] = useState('');
+
 
   const STORAGE_KEY = 'sessionSnapData';
 
@@ -179,7 +198,7 @@ export default function ManageProjectsClientsPage() {
   // React Hook Form instances
   const clientForm = useForm<z.infer<typeof clientSchema>>({
     resolver: zodResolver(clientSchema),
-    defaultValues: { name: "", phone: "" },
+    defaultValues: { name: "", phone: "", cnpj: "", email: "", whatsapp: "", observacoes: "" },
   });
 
   const projectForm = useForm<z.infer<typeof projectSchema>>({
@@ -192,7 +211,7 @@ export default function ManageProjectsClientsPage() {
   // Modal Open/Close Handlers
   const handleOpenClientModal = (client: ClientDocument | null = null) => {
     setEditingClient(client);
-    clientForm.reset(client || { name: "", phone: "" });
+    clientForm.reset(client || { name: "", phone: "", cnpj: "", email: "", whatsapp: "", observacoes: "" });
     setIsClientModalOpen(true);
   };
 
@@ -212,6 +231,15 @@ export default function ManageProjectsClientsPage() {
     setDeletingProjectId(projectId);
     setIsDeleteProjectDialogOpen(true);
   };
+  
+  const handleOpenNotaFiscalModal = (client: ClientDocument) => {
+    setGeneratingNotaForClient(client);
+    setNotaFiscalValue('');
+    setNotaFiscalDate(new Date());
+    setGeneratedNotaText('');
+    setIsNotaFiscalModalOpen(true);
+  };
+
 
   // CRUD Operations
   const onClientSubmit = (data: z.infer<typeof clientSchema>) => {
@@ -345,10 +373,25 @@ export default function ManageProjectsClientsPage() {
     setIsReceiptModalOpen(true);
   };
   
-  const handleCopyReceipt = () => {
-    navigator.clipboard.writeText(receiptText);
-    toast({ title: "Recibo Copiado!", description: "O texto do recibo foi copiado para a área de transferência." });
+  const handleCopyText = (textToCopy: string, successMessage: string) => {
+    navigator.clipboard.writeText(textToCopy);
+    toast({ title: "Copiado!", description: successMessage });
   };
+  
+  const handleGenerateNotaFiscalText = () => {
+    if (!generatingNotaForClient || !notaFiscalValue || !notaFiscalDate) {
+      toast({ title: "Dados Incompletos", description: "Preencha o valor e a data para gerar o texto da nota.", variant: "destructive" });
+      return;
+    }
+    const { name, cnpj } = generatingNotaForClient;
+    const dateFormatted = format(notaFiscalDate, 'dd/MM/yyyy');
+    const valueFormatted = parseFloat(notaFiscalValue).toFixed(2);
+
+    const text = `Tomador: ${name} - ${cnpj}\nValor: R$${valueFormatted}\nData: ${dateFormatted}\nCNAE 5911-1/99 – Atividades de produção cinematográfica, de vídeos e de programas de televisão não especificadas anteriormente`;
+    
+    setGeneratedNotaText(text);
+  }
+
 
   if (!isDataLoaded) {
     return <div className="flex h-screen items-center justify-center p-8">Carregando dados...</div>;
@@ -380,9 +423,12 @@ export default function ManageProjectsClientsPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-2xl text-primary">{client.name}</CardTitle>
-                  <CardDescription className="text-muted-foreground">{client.phone}</CardDescription>
+                  <CardDescription className="text-muted-foreground">CNPJ: {client.cnpj} | Telefone: {client.phone}</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap justify-end">
+                  <Button onClick={() => handleOpenNotaFiscalModal(client)} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
+                      <FileText className="mr-1 h-4 w-4" /> Gerar Nota Fiscal
+                  </Button>
                   <Button onClick={() => handleOpenClientModal(client)} variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
                     <Pencil className="mr-1 h-4 w-4" /> Editar Cliente
                   </Button>
@@ -530,25 +576,43 @@ export default function ManageProjectsClientsPage() {
 
       {/* Client Add/Edit Modal */}
       <Dialog open={isClientModalOpen} onOpenChange={setIsClientModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingClient ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</DialogTitle>
             <DialogDescription>
-              {editingClient ? 'Atualize as informações do cliente.' : 'Preencha as informações do novo cliente.'}
+              {editingClient ? 'Atualize as informações detalhadas do cliente.' : 'Preencha as informações do novo cliente.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={clientForm.handleSubmit(onClientSubmit)}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Nome</Label>
-                <Input id="name" {...clientForm.register('name')} className="col-span-3" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Razão Social</Label>
+                <Input id="name" {...clientForm.register('name')} />
+                {clientForm.formState.errors.name && <p className="text-destructive text-sm">{clientForm.formState.errors.name.message}</p>}
               </div>
-              {clientForm.formState.errors.name && <p className="col-span-4 text-right text-destructive text-sm">{clientForm.formState.errors.name.message}</p>}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone" className="text-right">Telefone</Label>
-                <Input id="phone" {...clientForm.register('phone')} className="col-span-3" />
+              <div className="space-y-2">
+                <Label htmlFor="cnpj">CNPJ</Label>
+                <Input id="cnpj" {...clientForm.register('cnpj')} />
+                {clientForm.formState.errors.cnpj && <p className="text-destructive text-sm">{clientForm.formState.errors.cnpj.message}</p>}
               </div>
-              {clientForm.formState.errors.phone && <p className="col-span-4 text-right text-destructive text-sm">{clientForm.formState.errors.phone.message}</p>}
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone</Label>
+                <Input id="phone" {...clientForm.register('phone')} />
+                {clientForm.formState.errors.phone && <p className="text-destructive text-sm">{clientForm.formState.errors.phone.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp">WhatsApp (Opcional)</Label>
+                <Input id="whatsapp" {...clientForm.register('whatsapp')} />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="email">E-mail (Opcional)</Label>
+                <Input id="email" type="email" {...clientForm.register('email')} />
+                {clientForm.formState.errors.email && <p className="text-destructive text-sm">{clientForm.formState.errors.email.message}</p>}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="observacoes">Observações Internas (Opcional)</Label>
+                <Textarea id="observacoes" {...clientForm.register('observacoes')} />
+              </div>
             </div>
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="secondary">Cancelar</Button></DialogClose>
@@ -689,7 +753,7 @@ export default function ManageProjectsClientsPage() {
                 />
             </div>
             <DialogFooter className="gap-2 sm:justify-start">
-                <Button onClick={handleCopyReceipt}>
+                <Button onClick={() => handleCopyText(receiptText, "O texto do recibo foi copiado.")}>
                     <Copy className="mr-2 h-4 w-4" />
                     Copiar Texto
                 </Button>
@@ -701,6 +765,72 @@ export default function ManageProjectsClientsPage() {
             </DialogFooter>
         </DialogContent>
     </Dialog>
+    
+    {/* Nota Fiscal Modal */}
+    <Dialog open={isNotaFiscalModalOpen} onOpenChange={setIsNotaFiscalModalOpen}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Gerar Texto para Nota Fiscal</DialogTitle>
+                <DialogDescription>
+                    Para: {generatingNotaForClient?.name}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                    <Label htmlFor="nf-valor">Valor (R$)</Label>
+                    <Input id="nf-valor" type="number" value={notaFiscalValue} onChange={(e) => setNotaFiscalValue(e.target.value)} placeholder="ex: 1500.00" />
+                </div>
+                <div className="space-y-2">
+                    <Label>Data de Emissão</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            variant={"outline"}
+                            className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !notaFiscalDate && "text-muted-foreground"
+                            )}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {notaFiscalDate ? format(notaFiscalDate, "PPP", { locale: ptBR}) : <span>Escolha uma data</span>}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                        <Calendar
+                            mode="single"
+                            selected={notaFiscalDate}
+                            onSelect={setNotaFiscalDate}
+                            initialFocus
+                        />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+
+                <Button onClick={handleGenerateNotaFiscalText} className="w-full">Gerar Texto</Button>
+                
+                {generatedNotaText && (
+                  <div className="space-y-2 pt-4">
+                      <Label>Texto Gerado:</Label>
+                      <Textarea
+                          readOnly
+                          value={generatedNotaText}
+                          className="h-40 font-mono text-sm bg-muted/50 resize-none"
+                      />
+                      <Button variant="outline" size="sm" onClick={() => handleCopyText(generatedNotaText, "Texto da nota fiscal copiado.")}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copiar Texto
+                      </Button>
+                  </div>
+                )}
+            </div>
+            <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="button" variant="secondary">Fechar</Button>
+                </DialogClose>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
     </div>
   );
 }
