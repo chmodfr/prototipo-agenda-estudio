@@ -1,5 +1,5 @@
 
-import { Music2, FolderGit2 } from 'lucide-react';
+import { Music2, FolderGit2, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 export function AppHeader() {
@@ -19,6 +19,10 @@ export function AppHeader() {
           <Link href="/manage-projects" className="text-foreground hover:text-primary transition-colors text-sm font-medium flex items-center gap-1.5">
             <FolderGit2 className="h-5 w-5" />
             Gerenciar Clientes e Projetos
+          </Link>
+           <Link href="/settings" className="text-foreground hover:text-primary transition-colors text-sm font-medium flex items-center gap-1.5">
+            <Settings className="h-5 w-5" />
+            Configurações
           </Link>
         </nav>
       </div>
